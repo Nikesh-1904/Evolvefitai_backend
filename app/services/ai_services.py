@@ -482,8 +482,9 @@ Requirements:
 - Goal: {goal}
 - Fitness Level: {level}
 - Duration: {duration} minutes
-- Include 4-6 exercises
+- Number of Exercises depends on Fitness level and Goal
 - Provide sets and reps for each exercise
+- Provide Description on how to Perform the Exercise
 
 Output ONLY this JSON format:
 {{
