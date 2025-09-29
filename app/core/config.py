@@ -1,40 +1,41 @@
+# app/core/config.py - Updated with new API keys
+
 import os
-from typing import List
-from pydantic import AnyHttpUrl
 from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
-    PROJECT_NAME: str = "EvolveFit AI"
-    VERSION: str = "1.0.0"
-    
     # Database
-    DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./evolvefit.db")
+    DATABASE_URL: str = os.getenv("DATABASE_URL", "postgresql+asyncpg://user:password@localhost/evolvefitai")
     
-    # JWT Settings
-    SECRET_KEY: str = os.getenv("SECRET_KEY", "your-super-secret-jwt-key-change-in-production")
-    
-    # Frontend URL for CORS
-    FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost:3000")
-    
-    # --- THIS IS THE NEW LINE ---
-    # Backend URL for constructing OAuth callback URLs
-    BACKEND_URL: str = os.getenv("BACKEND_URL", "http://localhost:8000")
+    # Security
+    SECRET_KEY: str = os.getenv("SECRET_KEY", "your-secret-key-here")
+    ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     
     # Google OAuth
     GOOGLE_CLIENT_ID: str = os.getenv("GOOGLE_CLIENT_ID", "")
     GOOGLE_CLIENT_SECRET: str = os.getenv("GOOGLE_CLIENT_SECRET", "")
     
-    # FREE AI APIs
+    # Frontend URL
+    FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost:3000")
+    
+    # AI Services - ENHANCED
     GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "")
     HUGGINGFACE_API_KEY: str = os.getenv("HUGGINGFACE_API_KEY", "")
+    OPENROUTER_API_KEY: str = os.getenv("OPENROUTER_API_KEY", "")  # NEW
+    OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")  # Optional
+    
+    # Local AI
     OLLAMA_URL: str = os.getenv("OLLAMA_URL", "http://localhost:11434")
     
-    # YouTube API
-    YOUTUBE_API_KEY: str = os.getenv("YOUTUBE_API_KEY", "")
+    # YouTube API for exercise videos
+    YOUTUBE_API_KEY: str = os.getenv("YOUTUBE_API_KEY", "")  # NEW
     
+    # App Settings
+    APP_NAME: str = "EvolveFit AI"
+    DEBUG: bool = os.getenv("DEBUG", "False").lower() == "true"
+
     class Config:
         env_file = ".env"
-        case_sensitive = True
 
 settings = Settings()
-

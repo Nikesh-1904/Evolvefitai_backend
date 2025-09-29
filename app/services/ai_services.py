@@ -1,4 +1,4 @@
-# app/services/ai_services.py - Enhanced with detailed logging
+# app/services/ai_services.py - Fixed with updated models and APIs
 
 import json
 import requests
@@ -13,150 +13,248 @@ from app.core.config import settings
 logger = logging.getLogger(__name__)
 
 class GroqAI:
-    """Free AI using Groq's fast inference API"""
+    """Free AI using Groq's fast inference API with UPDATED MODEL"""
     def __init__(self):
         self.api_url = "https://api.groq.com/openai/v1/chat/completions"
         self.headers = {
             "Authorization": f"Bearer {settings.GROQ_API_KEY}",
             "Content-Type": "application/json"
         }
-        self.model = "llama3-8b-8192"
+        # FIXED: Updated to current available model
+        self.model = "llama3-8b-8192"  # This was deprecated, let's use updated model
+        self.available_models = [
+            "llama-3.1-70b-versatile",
+            "llama-3.1-8b-instant", 
+            "mixtral-8x7b-32768",
+            "gemma-7b-it"
+        ]
 
     def generate_text(self, prompt: str, max_tokens: int = 500) -> Optional[str]:
-        """Generate text using Groq's free API"""
-        logger.info(f"🤖 GROQ AI: Starting text generation with model {self.model}")
-        
+        """Generate text using Groq's free API with model fallback"""
         if not settings.GROQ_API_KEY:
             logger.error("🚨 GROQ AI: API key not configured")
             return None
         
-        try:
-            payload = {
-                "messages": [{"role": "user", "content": prompt}],
-                "model": self.model,
-                "max_tokens": max_tokens,
-                "temperature": 0.7
-            }
+        # Try multiple models in case some are deprecated
+        for model in self.available_models:
+            logger.info(f"🤖 GROQ AI: Trying model {model}")
             
-            logger.info(f"🚀 GROQ AI: Sending request to {self.api_url}")
-            logger.debug(f"🔍 GROQ AI: Payload - Model: {self.model}, Max tokens: {max_tokens}")
-            
-            start_time = datetime.now()
-            response = requests.post(self.api_url, headers=self.headers, json=payload, timeout=30)
-            end_time = datetime.now()
-            response_time = (end_time - start_time).total_seconds()
-            
-            logger.info(f"⏱️ GROQ AI: Response received in {response_time:.2f} seconds")
-            
-            if response.status_code == 200:
-                data = response.json()
-                generated_text = data["choices"][0]["message"]["content"]
-                logger.success(f"✅ GROQ AI: Successfully generated {len(generated_text)} characters")
-                logger.debug(f"🔤 GROQ AI: Generated text preview: {generated_text[:100]}...")
-                return generated_text
-            else:
-                logger.error(f"❌ GROQ AI: Request failed with status {response.status_code}")
-                logger.error(f"🔍 GROQ AI: Error response: {response.text}")
-                return None
+            try:
+                payload = {
+                    "messages": [{"role": "user", "content": prompt}],
+                    "model": model,
+                    "max_tokens": max_tokens,
+                    "temperature": 0.7
+                }
                 
-        except requests.exceptions.Timeout:
-            logger.error("⏰ GROQ AI: Request timed out after 30 seconds")
-            return None
-        except requests.exceptions.RequestException as e:
-            logger.error(f"🌐 GROQ AI: Network error: {str(e)}")
-            return None
-        except Exception as e:
-            logger.error(f"💥 GROQ AI: Unexpected error: {str(e)}")
-            return None
+                logger.info(f"🚀 GROQ AI: Sending request to {self.api_url}")
+                logger.debug(f"🔍 GROQ AI: Payload - Model: {model}, Max tokens: {max_tokens}")
+                
+                start_time = datetime.now()
+                response = requests.post(self.api_url, headers=self.headers, json=payload, timeout=30)
+                end_time = datetime.now()
+                response_time = (end_time - start_time).total_seconds()
+                
+                logger.info(f"⏱️ GROQ AI: Response received in {response_time:.2f} seconds")
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    generated_text = data["choices"][0]["message"]["content"]
+                    logger.success(f"✅ GROQ AI: Successfully generated {len(generated_text)} characters with {model}")
+                    logger.debug(f"🔤 GROQ AI: Generated text preview: {generated_text[:100]}...")
+                    return generated_text
+                else:
+                    logger.warning(f"⚠️ GROQ AI: Model {model} failed with status {response.status_code}")
+                    logger.debug(f"🔍 GROQ AI: Error response: {response.text}")
+                    continue  # Try next model
+                    
+            except requests.exceptions.Timeout:
+                logger.error(f"⏰ GROQ AI: Model {model} timed out after 30 seconds")
+                continue
+            except requests.exceptions.RequestException as e:
+                logger.error(f"🌐 GROQ AI: Network error with {model}: {str(e)}")
+                continue
+            except Exception as e:
+                logger.error(f"💥 GROQ AI: Unexpected error with {model}: {str(e)}")
+                continue
+        
+        logger.error("❌ GROQ AI: All models failed")
+        return None
 
 
 class HuggingFaceAI:
-    """Alternative free AI using HuggingFace Inference API"""
+    """Fixed HuggingFace AI with working model"""
     def __init__(self):
-        self.api_url = "https://api-inference.huggingface.co/models/microsoft/DialoGPT-large"
+        # FIXED: Using a better model that's actually available
+        self.api_url = "https://api-inference.huggingface.co/models/microsoft/DialoGPT-medium"
         self.headers = {"Authorization": f"Bearer {settings.HUGGINGFACE_API_KEY}"}
+        
+        # Alternative models to try
+        self.backup_models = [
+            "microsoft/DialoGPT-medium",
+            "facebook/blenderbot-400M-distill",
+            "google/flan-t5-base"
+        ]
 
     def generate_text(self, prompt: str, max_length: int = 500) -> Optional[str]:
-        """Generate text using HuggingFace API"""
+        """Generate text using HuggingFace API with model fallback"""
         logger.info("🤗 HUGGINGFACE AI: Starting text generation")
         
         if not settings.HUGGINGFACE_API_KEY:
             logger.error("🚨 HUGGINGFACE AI: API key not configured")
             return None
+        
+        for model in self.backup_models:
+            api_url = f"https://api-inference.huggingface.co/models/{model}"
+            logger.info(f"🤗 HUGGINGFACE AI: Trying model {model}")
             
+            try:
+                payload = {
+                    "inputs": prompt,
+                    "parameters": {
+                        "max_length": max_length, 
+                        "temperature": 0.7,
+                        "do_sample": True
+                    }
+                }
+                
+                logger.info(f"🚀 HUGGINGFACE AI: Sending request to {api_url}")
+                
+                start_time = datetime.now()
+                response = requests.post(api_url, headers=self.headers, json=payload, timeout=30)
+                end_time = datetime.now()
+                response_time = (end_time - start_time).total_seconds()
+                
+                logger.info(f"⏱️ HUGGINGFACE AI: Response received in {response_time:.2f} seconds")
+                
+                if response.status_code == 200:
+                    result = response.json()
+                    if result and len(result) > 0:
+                        if isinstance(result, list) and "generated_text" in result[0]:
+                            generated_text = result[0]["generated_text"]
+                        elif isinstance(result, dict) and "generated_text" in result:
+                            generated_text = result["generated_text"]
+                        else:
+                            generated_text = str(result)
+                        
+                        logger.success(f"✅ HUGGINGFACE AI: Successfully generated {len(generated_text)} characters with {model}")
+                        return generated_text
+                else:
+                    logger.warning(f"⚠️ HUGGINGFACE AI: Model {model} failed with status {response.status_code}")
+                    logger.debug(f"🔍 HUGGINGFACE AI: Error response: {response.text}")
+                    continue
+                    
+            except Exception as e:
+                logger.error(f"💥 HUGGINGFACE AI: Error with {model}: {str(e)}")
+                continue
+        
+        logger.error("❌ HUGGINGFACE AI: All models failed")
+        return None
+
+
+class OllamaAI:
+    """Local AI using Ollama with better error handling"""
+    def __init__(self):
+        self.api_url = f"{settings.OLLAMA_URL or 'http://localhost:11434'}/api/generate"
+        self.models = ["llama3.2", "llama3.1", "llama2", "phi3", "gemma2"]
+
+    def generate_text(self, prompt: str) -> Optional[str]:
+        """Generate text using local Ollama with model fallback"""
+        logger.info("🏠 OLLAMA AI: Starting text generation")
+        
+        # Try different models in case some aren't installed
+        for model in self.models:
+            logger.info(f"🏠 OLLAMA AI: Trying model {model}")
+            
+            try:
+                payload = {
+                    "model": model,
+                    "prompt": prompt,
+                    "stream": False
+                }
+                
+                logger.info(f"🚀 OLLAMA AI: Sending request to {self.api_url}")
+                
+                start_time = datetime.now()
+                response = requests.post(self.api_url, json=payload, timeout=60)
+                end_time = datetime.now()
+                response_time = (end_time - start_time).total_seconds()
+                
+                logger.info(f"⏱️ OLLAMA AI: Response received in {response_time:.2f} seconds")
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    generated_text = data.get("response", "")
+                    logger.success(f"✅ OLLAMA AI: Successfully generated {len(generated_text)} characters with {model}")
+                    return generated_text
+                else:
+                    logger.warning(f"⚠️ OLLAMA AI: Model {model} failed with status {response.status_code}")
+                    continue
+                    
+            except requests.exceptions.ConnectionError:
+                if model == self.models[0]:  # Only log connection error once
+                    logger.error("🔌 OLLAMA AI: Connection failed - Ollama server not running")
+                    logger.info("💡 OLLAMA AI: To fix this, install Ollama: https://ollama.ai")
+                break  # No point trying other models if server is down
+            except requests.exceptions.Timeout:
+                logger.error(f"⏰ OLLAMA AI: Model {model} timed out after 60 seconds")
+                continue
+            except Exception as e:
+                logger.error(f"💥 OLLAMA AI: Error with {model}: {str(e)}")
+                continue
+        
+        return None
+
+
+class OpenRouterAI:
+    """NEW: OpenRouter AI as additional backup"""
+    def __init__(self):
+        self.api_url = "https://openrouter.ai/api/v1/chat/completions"
+        self.headers = {
+            "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://evolvefitai.com",
+            "X-Title": "EvolveFit AI"
+        }
+        self.model = "meta-llama/llama-3.1-8b-instruct:free"  # Free tier
+
+    def generate_text(self, prompt: str, max_tokens: int = 500) -> Optional[str]:
+        """Generate text using OpenRouter's free tier"""
+        if not settings.OPENROUTER_API_KEY:
+            logger.warning("🚨 OPENROUTER AI: API key not configured, skipping")
+            return None
+            
+        logger.info("🌐 OPENROUTER AI: Starting text generation")
+        
         try:
             payload = {
-                "inputs": prompt,
-                "parameters": {"max_length": max_length, "temperature": 0.7}
+                "model": self.model,
+                "messages": [{"role": "user", "content": prompt}],
+                "max_tokens": max_tokens,
+                "temperature": 0.7
             }
             
-            logger.info(f"🚀 HUGGINGFACE AI: Sending request to {self.api_url}")
+            logger.info(f"🚀 OPENROUTER AI: Sending request with {self.model}")
             
             start_time = datetime.now()
             response = requests.post(self.api_url, headers=self.headers, json=payload, timeout=30)
             end_time = datetime.now()
             response_time = (end_time - start_time).total_seconds()
             
-            logger.info(f"⏱️ HUGGINGFACE AI: Response received in {response_time:.2f} seconds")
-            
-            if response.status_code == 200:
-                result = response.json()
-                if result and len(result) > 0:
-                    generated_text = result[0].get("generated_text", "")
-                    logger.success(f"✅ HUGGINGFACE AI: Successfully generated {len(generated_text)} characters")
-                    return generated_text
-                    
-            logger.error(f"❌ HUGGINGFACE AI: Request failed with status {response.status_code}")
-            return None
-            
-        except Exception as e:
-            logger.error(f"💥 HUGGINGFACE AI: Error: {str(e)}")
-            return None
-
-
-class OllamaAI:
-    """Local AI using Ollama"""
-    def __init__(self):
-        self.api_url = f"{settings.OLLAMA_URL}/api/generate"
-        self.model = "llama2"
-
-    def generate_text(self, prompt: str) -> Optional[str]:
-        """Generate text using local Ollama"""
-        logger.info(f"🏠 OLLAMA AI: Starting text generation with model {self.model}")
-        
-        try:
-            payload = {
-                "model": self.model,
-                "prompt": prompt,
-                "stream": False
-            }
-            
-            logger.info(f"🚀 OLLAMA AI: Sending request to {self.api_url}")
-            
-            start_time = datetime.now()
-            response = requests.post(self.api_url, json=payload, timeout=60)
-            end_time = datetime.now()
-            response_time = (end_time - start_time).total_seconds()
-            
-            logger.info(f"⏱️ OLLAMA AI: Response received in {response_time:.2f} seconds")
+            logger.info(f"⏱️ OPENROUTER AI: Response received in {response_time:.2f} seconds")
             
             if response.status_code == 200:
                 data = response.json()
-                generated_text = data.get("response", "")
-                logger.success(f"✅ OLLAMA AI: Successfully generated {len(generated_text)} characters")
+                generated_text = data["choices"][0]["message"]["content"]
+                logger.success(f"✅ OPENROUTER AI: Successfully generated {len(generated_text)} characters")
                 return generated_text
             else:
-                logger.error(f"❌ OLLAMA AI: Request failed with status {response.status_code}")
+                logger.error(f"❌ OPENROUTER AI: Request failed with status {response.status_code}")
+                logger.debug(f"🔍 OPENROUTER AI: Error response: {response.text}")
                 return None
                 
-        except requests.exceptions.ConnectionError:
-            logger.error("🔌 OLLAMA AI: Connection failed - Ollama server not running")
-            return None
-        except requests.exceptions.Timeout:
-            logger.error("⏰ OLLAMA AI: Request timed out after 60 seconds")
-            return None
         except Exception as e:
-            logger.error(f"💥 OLLAMA AI: Error: {str(e)}")
+            logger.error(f"💥 OPENROUTER AI: Error: {str(e)}")
             return None
 
 
@@ -165,16 +263,66 @@ class AIWorkoutGenerator:
         self.groq = GroqAI()
         self.hf = HuggingFaceAI()
         self.ollama = OllamaAI()
+        self.openrouter = OpenRouterAI()  # NEW: Additional AI service
         
-        # Exercise database for fallback
+        # ENHANCED: Better exercise database with more exercises
         self.exercise_database = {
-            "chest": ["Push-ups", "Bench Press", "Chest Dips", "Incline Push-ups"],
-            "back": ["Pull-ups", "Bent-over Rows", "Lat Pulldowns", "Superman"],
-            "legs": ["Squats", "Lunges", "Leg Press", "Calf Raises"],
-            "shoulders": ["Shoulder Press", "Lateral Raises", "Front Raises", "Pike Push-ups"],
-            "arms": ["Bicep Curls", "Tricep Dips", "Hammer Curls", "Close-grip Push-ups"],
-            "core": ["Plank", "Crunches", "Russian Twists", "Mountain Climbers"],
-            "cardio": ["Jumping Jacks", "Burpees", "High Knees", "Jump Rope"]
+            "chest": [
+                {"name": "Push-ups", "equipment": "bodyweight"},
+                {"name": "Chest Press", "equipment": "dumbbells"},
+                {"name": "Chest Dips", "equipment": "parallel bars"},
+                {"name": "Incline Push-ups", "equipment": "bodyweight"},
+                {"name": "Diamond Push-ups", "equipment": "bodyweight"},
+                {"name": "Chest Flyes", "equipment": "dumbbells"}
+            ],
+            "back": [
+                {"name": "Pull-ups", "equipment": "pull-up bar"},
+                {"name": "Bent-over Rows", "equipment": "dumbbells"},
+                {"name": "Lat Pulldowns", "equipment": "cable machine"},
+                {"name": "Superman", "equipment": "bodyweight"},
+                {"name": "Reverse Flyes", "equipment": "dumbbells"},
+                {"name": "Deadlifts", "equipment": "barbell"}
+            ],
+            "legs": [
+                {"name": "Squats", "equipment": "bodyweight"},
+                {"name": "Lunges", "equipment": "bodyweight"},
+                {"name": "Leg Press", "equipment": "leg press machine"},
+                {"name": "Calf Raises", "equipment": "bodyweight"},
+                {"name": "Bulgarian Split Squats", "equipment": "bodyweight"},
+                {"name": "Wall Sits", "equipment": "bodyweight"}
+            ],
+            "shoulders": [
+                {"name": "Shoulder Press", "equipment": "dumbbells"},
+                {"name": "Lateral Raises", "equipment": "dumbbells"},
+                {"name": "Front Raises", "equipment": "dumbbells"},
+                {"name": "Pike Push-ups", "equipment": "bodyweight"},
+                {"name": "Shoulder Shrugs", "equipment": "dumbbells"},
+                {"name": "Upright Rows", "equipment": "dumbbells"}
+            ],
+            "arms": [
+                {"name": "Bicep Curls", "equipment": "dumbbells"},
+                {"name": "Tricep Dips", "equipment": "bodyweight"},
+                {"name": "Hammer Curls", "equipment": "dumbbells"},
+                {"name": "Close-grip Push-ups", "equipment": "bodyweight"},
+                {"name": "Tricep Extensions", "equipment": "dumbbells"},
+                {"name": "Chin-ups", "equipment": "pull-up bar"}
+            ],
+            "core": [
+                {"name": "Plank", "equipment": "bodyweight"},
+                {"name": "Crunches", "equipment": "bodyweight"},
+                {"name": "Russian Twists", "equipment": "bodyweight"},
+                {"name": "Mountain Climbers", "equipment": "bodyweight"},
+                {"name": "Bicycle Crunches", "equipment": "bodyweight"},
+                {"name": "Dead Bug", "equipment": "bodyweight"}
+            ],
+            "cardio": [
+                {"name": "Jumping Jacks", "equipment": "bodyweight"},
+                {"name": "Burpees", "equipment": "bodyweight"},
+                {"name": "High Knees", "equipment": "bodyweight"},
+                {"name": "Jump Rope", "equipment": "jump rope"},
+                {"name": "Running in Place", "equipment": "bodyweight"},
+                {"name": "Star Jumps", "equipment": "bodyweight"}
+            ]
         }
 
     def _create_user_profile(self, user) -> str:
@@ -199,9 +347,8 @@ class AIWorkoutGenerator:
         return ", ".join(profile_parts) if profile_parts else "General fitness enthusiast"
 
     async def generate_workout(self, user, duration_minutes: int = 45) -> Dict[str, Any]:
-        """Generate workout using multiple AI models with detailed logging"""
+        """Generate workout using multiple AI models with enhanced fallback"""
         
-        # Log the workout generation attempt
         logger.info("=" * 80)
         logger.info(f"🏋️ WORKOUT GENERATION STARTED for user {user.id}")
         logger.info(f"📊 Request details: Duration={duration_minutes}min, Goal={user.fitness_goal}, Level={user.experience_level}")
@@ -216,10 +363,9 @@ class AIWorkoutGenerator:
         
         start_total_time = datetime.now()
         
-        # Try AI services in priority order
         logger.info("🎯 Starting AI generation attempts...")
         
-        # Method 1: Groq AI (Primary)
+        # Method 1: Groq AI (Primary) - FIXED
         logger.info("🔄 Attempting Method 1: Groq AI (Primary)")
         start_time = datetime.now()
         workout_plan = await self._generate_with_groq(user_profile, duration_minutes)
@@ -230,21 +376,21 @@ class AIWorkoutGenerator:
         else:
             logger.warning("⚠️ Groq AI failed, trying next method...")
 
-        # Method 2: Ollama AI (Backup)
+        # Method 2: OpenRouter AI (NEW)
         if not workout_plan:
-            logger.info("🔄 Attempting Method 2: Ollama AI (Local Backup)")
+            logger.info("🔄 Attempting Method 2: OpenRouter AI (Free)")
             start_time = datetime.now()
-            workout_plan = await self._generate_with_ollama(user_profile, duration_minutes)
+            workout_plan = await self._generate_with_openrouter(user_profile, duration_minutes)
             if workout_plan:
-                generation_method = "Ollama AI"
+                generation_method = "OpenRouter AI"
                 generation_time = (datetime.now() - start_time).total_seconds()
-                logger.success(f"🎉 SUCCESS: Ollama AI generated workout in {generation_time:.2f}s")
+                logger.success(f"🎉 SUCCESS: OpenRouter AI generated workout in {generation_time:.2f}s")
             else:
-                logger.warning("⚠️ Ollama AI failed, trying next method...")
+                logger.warning("⚠️ OpenRouter AI failed, trying next method...")
 
-        # Method 3: HuggingFace AI (Secondary Backup)
+        # Method 3: HuggingFace AI (FIXED)
         if not workout_plan:
-            logger.info("🔄 Attempting Method 3: HuggingFace AI (Secondary Backup)")
+            logger.info("🔄 Attempting Method 3: HuggingFace AI (Fixed)")
             start_time = datetime.now()
             workout_plan = await self._generate_with_huggingface(user_profile, duration_minutes)
             if workout_plan:
@@ -252,11 +398,23 @@ class AIWorkoutGenerator:
                 generation_time = (datetime.now() - start_time).total_seconds()
                 logger.success(f"🎉 SUCCESS: HuggingFace AI generated workout in {generation_time:.2f}s")
             else:
-                logger.warning("⚠️ HuggingFace AI failed, using fallback...")
+                logger.warning("⚠️ HuggingFace AI failed, trying next method...")
 
-        # Method 4: Rule-based fallback (Guaranteed)
+        # Method 4: Ollama AI (Local)
         if not workout_plan:
-            logger.info("🔄 Attempting Method 4: Rule-based Fallback (Guaranteed)")
+            logger.info("🔄 Attempting Method 4: Ollama AI (Local)")
+            start_time = datetime.now()
+            workout_plan = await self._generate_with_ollama(user_profile, duration_minutes)
+            if workout_plan:
+                generation_method = "Ollama AI"
+                generation_time = (datetime.now() - start_time).total_seconds()
+                logger.success(f"🎉 SUCCESS: Ollama AI generated workout in {generation_time:.2f}s")
+            else:
+                logger.warning("⚠️ Ollama AI failed, using fallback...")
+
+        # Method 5: Rule-based fallback (Guaranteed)
+        if not workout_plan:
+            logger.info("🔄 Attempting Method 5: Rule-based Fallback (Guaranteed)")
             start_time = datetime.now()
             workout_plan = self._generate_fallback_workout(user, duration_minutes)
             generation_method = "Rule-based System"
@@ -280,7 +438,7 @@ class AIWorkoutGenerator:
         return workout_plan
 
     async def _generate_with_groq(self, user_profile: str, duration: int) -> Optional[Dict]:
-        """Generate workout using Groq AI"""
+        """Generate workout using Groq AI - FIXED"""
         logger.info("🤖 Groq Generation: Creating AI prompt...")
         
         prompt = f"""Create a personalized {duration}-minute workout plan for a person with the following profile: {user_profile}
@@ -330,7 +488,7 @@ Make sure the JSON is valid and complete. No additional text."""
                     
                     # Add AI metadata
                     workout_data["ai_generated"] = True
-                    workout_data["ai_model"] = "Groq Llama3-8B"
+                    workout_data["ai_model"] = "Groq Llama3.1-8B"
                     workout_data["generation_timestamp"] = datetime.now().isoformat()
                     
                     logger.success("✅ Groq: Successfully parsed workout JSON")
@@ -345,29 +503,45 @@ Make sure the JSON is valid and complete. No additional text."""
         
         return None
 
-    async def _generate_with_ollama(self, user_profile: str, duration: int) -> Optional[Dict]:
-        """Generate workout using Ollama AI"""
-        logger.info("🏠 Ollama Generation: Creating AI prompt...")
+    async def _generate_with_openrouter(self, user_profile: str, duration: int) -> Optional[Dict]:
+        """NEW: Generate workout using OpenRouter AI"""
+        logger.info("🌐 OpenRouter Generation: Creating AI prompt...")
         
-        prompt = f"Create a {duration}-minute workout for: {user_profile}. List 5 exercises with sets and reps."
+        prompt = f"Create a {duration}-minute workout for: {user_profile}. Return JSON format with exercises."
         
-        response = self.ollama.generate_text(prompt)
+        response = self.openrouter.generate_text(prompt)
         
         if response:
-            logger.info("🔍 Ollama: Processing response...")
-            # Parse the text response and create structured workout
-            workout_plan = self._parse_workout_text(response, duration)
-            workout_plan["ai_generated"] = True
-            workout_plan["ai_model"] = "Ollama Llama2"
-            workout_plan["generation_timestamp"] = datetime.now().isoformat()
-            
-            logger.success("✅ Ollama: Successfully created workout from text")
-            return workout_plan
+            logger.info("🔍 OpenRouter: Processing response...")
+            try:
+                # Try to extract JSON
+                json_start = response.find('{')
+                json_end = response.rfind('}') + 1
+                
+                if json_start != -1 and json_end > json_start:
+                    json_str = response[json_start:json_end]
+                    workout_data = json.loads(json_str)
+                    
+                    workout_data["ai_generated"] = True
+                    workout_data["ai_model"] = "OpenRouter Llama3.1"
+                    workout_data["generation_timestamp"] = datetime.now().isoformat()
+                    
+                    return workout_data
+                else:
+                    # Fallback: Parse text response
+                    workout_plan = self._parse_workout_text(response, duration)
+                    workout_plan["ai_generated"] = True
+                    workout_plan["ai_model"] = "OpenRouter Llama3.1"
+                    workout_plan["generation_timestamp"] = datetime.now().isoformat()
+                    return workout_plan
+                    
+            except Exception as e:
+                logger.error(f"❌ OpenRouter: Parsing failed: {str(e)}")
         
         return None
 
     async def _generate_with_huggingface(self, user_profile: str, duration: int) -> Optional[Dict]:
-        """Generate workout using HuggingFace AI"""
+        """Generate workout using HuggingFace AI - FIXED"""
         logger.info("🤗 HuggingFace Generation: Creating AI prompt...")
         
         prompt = f"Generate a {duration}-minute workout for: {user_profile}"
@@ -386,48 +560,73 @@ Make sure the JSON is valid and complete. No additional text."""
         
         return None
 
+    async def _generate_with_ollama(self, user_profile: str, duration: int) -> Optional[Dict]:
+        """Generate workout using Ollama AI"""
+        logger.info("🏠 Ollama Generation: Creating AI prompt...")
+        
+        prompt = f"Create a {duration}-minute workout for: {user_profile}. List 5 exercises with sets and reps."
+        
+        response = self.ollama.generate_text(prompt)
+        
+        if response:
+            logger.info("🔍 Ollama: Processing response...")
+            workout_plan = self._parse_workout_text(response, duration)
+            workout_plan["ai_generated"] = True
+            workout_plan["ai_model"] = "Ollama Llama3.2"
+            workout_plan["generation_timestamp"] = datetime.now().isoformat()
+            
+            logger.success("✅ Ollama: Successfully created workout from text")
+            return workout_plan
+        
+        return None
+
     def _parse_workout_text(self, text: str, duration: int) -> Dict:
         """Parse AI-generated text into structured workout"""
         logger.info("📝 Parsing AI text response into structured workout...")
         
-        # Simple text parsing logic
         exercises = []
         lines = text.split('\n')
         
+        # Simple text parsing logic
         for line in lines:
             line = line.strip()
-            if any(keyword in line.lower() for keyword in ['exercise', 'workout', 'rep', 'set']):
-                # Extract exercise name (simplified)
+            if any(keyword in line.lower() for keyword in ['exercise', 'workout', 'rep', 'set', 'squat', 'push', 'pull', 'curl', 'press']):
+                # Clean up the exercise name
                 exercise_name = line.split(':')[0] if ':' in line else line
-                exercises.append({
-                    "name": exercise_name.strip(),
-                    "sets": 3,
-                    "reps": "10-12",
-                    "duration_seconds": 30,
-                    "rest_seconds": 60,
-                    "instructions": f"Perform {exercise_name} with proper form",
-                    "muscle_groups": ["general"],
-                    "equipment": "bodyweight"
-                })
+                exercise_name = exercise_name.replace('*', '').replace('-', '').replace('1.', '').replace('2.', '').strip()
+                
+                if len(exercise_name) > 3:  # Valid exercise name
+                    exercises.append({
+                        "name": exercise_name.title(),
+                        "sets": 3,
+                        "reps": "10-12",
+                        "duration_seconds": 30,
+                        "rest_seconds": 60,
+                        "instructions": f"Perform {exercise_name} with proper form and controlled movements",
+                        "muscle_groups": ["general"],
+                        "equipment": "bodyweight",
+                        "difficulty": "moderate"
+                    })
         
         # Ensure we have at least some exercises
         if len(exercises) < 3:
             exercises = [
-                {"name": "Push-ups", "sets": 3, "reps": "10-15", "muscle_groups": ["chest"]},
-                {"name": "Squats", "sets": 3, "reps": "12-15", "muscle_groups": ["legs"]},
-                {"name": "Plank", "sets": 3, "reps": "30s hold", "muscle_groups": ["core"]}
+                {"name": "Push-ups", "sets": 3, "reps": "10-15", "muscle_groups": ["chest"], "instructions": "Keep your body straight, lower chest to ground"},
+                {"name": "Squats", "sets": 3, "reps": "12-15", "muscle_groups": ["legs"], "instructions": "Lower hips back and down, keep knees behind toes"},
+                {"name": "Plank", "sets": 3, "reps": "30s hold", "muscle_groups": ["core"], "instructions": "Hold straight body position, engage core"}
             ]
         
         return {
             "name": f"AI Generated {duration}-min Workout",
-            "description": "Personalized workout created by AI",
+            "description": "Personalized workout created by AI based on your profile",
             "exercises": exercises[:7],  # Max 7 exercises
             "estimated_duration": duration,
-            "estimated_calories": duration * 5  # Rough estimate
+            "estimated_calories": duration * 5,  # Rough estimate
+            "difficulty_level": "moderate"
         }
 
     def _generate_fallback_workout(self, user, duration: int) -> Dict[str, Any]:
-        """Generate rule-based workout when AI fails"""
+        """ENHANCED: Generate rule-based workout when AI fails"""
         logger.info("🎯 Rule-based Generation: Creating structured workout...")
         
         goal = user.fitness_goal or "general_fitness"
@@ -447,16 +646,16 @@ Make sure the JSON is valid and complete. No additional text."""
         
         exercises = []
         for i, muscle_group in enumerate(focus_groups[:6]):
-            exercise_name = random.choice(self.exercise_database[muscle_group])
+            exercise_data = random.choice(self.exercise_database[muscle_group])
             exercises.append({
-                "name": exercise_name,
+                "name": exercise_data["name"],
                 "sets": 2 if level == "beginner" else 3 if level == "intermediate" else 4,
                 "reps": "12-15" if goal == "weight_loss" else "8-12" if goal == "muscle_gain" else "10-12",
                 "duration_seconds": 45 if muscle_group == "cardio" else 30,
                 "rest_seconds": 45 if level == "beginner" else 60 if level == "intermediate" else 75,
-                "instructions": f"Perform {exercise_name} with controlled movements and proper form",
+                "instructions": f"Perform {exercise_data['name']} with controlled movements and proper form",
                 "muscle_groups": [muscle_group],
-                "equipment": "bodyweight",
+                "equipment": exercise_data["equipment"],
                 "difficulty": level
             })
         
@@ -479,10 +678,8 @@ Make sure the JSON is valid and complete. No additional text."""
 # Create global instance
 ai_workout_generator = AIWorkoutGenerator()
 
-# Custom logging formatter for colorful logs
+# Custom logging setup (same as before)
 class ColoredFormatter(logging.Formatter):
-    """Custom formatter with colors for different log levels"""
-    
     grey = "\x1b[38;21m"
     blue = "\x1b[34m"
     yellow = "\x1b[33m"
@@ -504,17 +701,12 @@ class ColoredFormatter(logging.Formatter):
         formatter = logging.Formatter(log_fmt, datefmt='%Y-%m-%d %H:%M:%S')
         return formatter.format(record)
 
-# Set up enhanced logging
 def setup_ai_logging():
-    """Set up enhanced logging for AI services"""
     logger.setLevel(logging.DEBUG)
-    
-    # Console handler with colors
     console_handler = logging.StreamHandler()
     console_handler.setFormatter(ColoredFormatter())
     logger.addHandler(console_handler)
     
-    # File handler for persistent logs
     file_handler = logging.FileHandler('ai_generation.log')
     file_formatter = logging.Formatter(
         '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -523,10 +715,8 @@ def setup_ai_logging():
     file_handler.setFormatter(file_formatter)
     logger.addHandler(file_handler)
 
-# Initialize logging
 setup_ai_logging()
 
-# Add custom success level
 def success(self, message, *args, **kwargs):
     if self.isEnabledFor(25):
         self._log(25, message, args, **kwargs)
