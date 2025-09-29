@@ -44,7 +44,8 @@ def get_jwt_strategy() -> JWTStrategy:
     return JWTStrategy(secret=SECRET, lifetime_seconds=3600)
 
 
-bearer_transport = BearerTransport(tokenUrl="auth/login") # Corrected from /auth/jwt/login
+# Note: The tokenUrl should match the route we fixed earlier in api/v1/auth.py
+bearer_transport = BearerTransport(tokenUrl="auth/login")
 
 auth_backend = AuthenticationBackend(
     name="jwt",
@@ -54,15 +55,10 @@ auth_backend = AuthenticationBackend(
 
 # Google OAuth2 client setup if keys provided
 if settings.GOOGLE_CLIENT_ID and settings.GOOGLE_CLIENT_SECRET:
-    # --- THIS IS THE CORRECTED SECTION ---
-    # We explicitly define the redirect_uri to prevent misinterpretation by proxies.
-    redirect_uri = f"{settings.BACKEND_URL}/api/v1/auth/google/callback"
-    
+    # This section is now reverted to its correct state for your library version
     google_oauth_client = GoogleOAuth2(
         client_id=settings.GOOGLE_CLIENT_ID,
         client_secret=settings.GOOGLE_CLIENT_SECRET,
-        redirect_uri=redirect_uri,
-        name="google" # Add name for multi-provider support
     )
 else:
     google_oauth_client = None
@@ -71,3 +67,4 @@ fastapi_users = FastAPIUsers[User, uuid.UUID](get_user_manager, [auth_backend])
 
 current_active_user = fastapi_users.current_user(active=True)
 current_user = fastapi_users.current_user()
+
