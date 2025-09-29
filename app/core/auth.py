@@ -1,4 +1,3 @@
-# app/core/auth.py
 import uuid
 from typing import Optional
 from fastapi import Depends, Request
@@ -12,7 +11,6 @@ from app.core.database import get_async_session
 from app.models import User, OAuthAccount
 
 SECRET = settings.SECRET_KEY
-
 
 class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
     reset_password_token_secret = SECRET
@@ -32,24 +30,18 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
         print(f"Verification requested for user {user.id}. Token: {token}")
 
     async def on_after_login(
-        self,
-        user: User,
-        request: Optional[Request] = None,
+        self, user: User, request: Optional[Request] = None
     ):
         print(f"User {user.id} logged in.")
-
 
 async def get_user_db(session=Depends(get_async_session)):
     yield SQLAlchemyUserDatabase(session, User, OAuthAccount)
 
-
 async def get_user_manager(user_db=Depends(get_user_db)):
     yield UserManager(user_db)
 
-
 def get_jwt_strategy() -> JWTStrategy:
     return JWTStrategy(secret=SECRET, lifetime_seconds=3600 * 24)  # 24 hours
-
 
 bearer_transport = BearerTransport(tokenUrl="auth/jwt/login")
 
@@ -66,7 +58,6 @@ if settings.GOOGLE_CLIENT_ID and settings.GOOGLE_CLIENT_SECRET:
     )
 else:
     google_oauth_client = None
-
 
 fastapi_users = FastAPIUsers[User, uuid.UUID](get_user_manager, [auth_backend])
 
