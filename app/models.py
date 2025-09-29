@@ -1,0 +1,163 @@
+from fastapi_users.db import SQLAlchemyBaseUserTableUUID
+from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, Float, ForeignKey, JSON
+from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
+from sqlalchemy.dialects.postgresql import UUID
+import uuid
+from app.core.database import Base
+
+class User(SQLAlchemyBaseUserTableUUID, Base):
+    """User model with FastAPI Users integration"""
+    __tablename__ = "users"
+    
+    # FastAPI Users provides: id (UUID), email, hashed_password, is_active, is_superuser, is_verified
+    
+    # Additional profile fields
+    username = Column(String, unique=True, index=True)
+    full_name = Column(String)
+    
+    # Fitness profile
+    age = Column(Integer)
+    weight = Column(Float)  # kg
+    height = Column(Float)  # cm
+    gender = Column(String)
+    fitness_goal = Column(String)  # weight_loss, muscle_gain, strength, endurance
+    experience_level = Column(String)  # beginner, intermediate, advanced
+    activity_level = Column(String)  # sedentary, lightly_active, moderate, very_active
+    
+    # Preferences
+    dietary_restrictions = Column(JSON, default=list)
+    
+    # Timestamps
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    # Relationships
+    workout_logs = relationship("WorkoutLog", back_populates="user")
+    workout_plans = relationship("WorkoutPlan", back_populates="user")
+    meal_plans = relationship("MealPlan", back_populates="user")
+    tip_interactions = relationship("TipInteraction", back_populates="user")
+    video_preferences = relationship("VideoPreference", back_populates="user")
+
+class Exercise(Base):
+    __tablename__ = "exercises"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False, index=True)
+    category = Column(String)  # chest, back, legs, cardio, etc.
+    muscle_groups = Column(JSON, default=list)
+    equipment = Column(String)
+    difficulty = Column(String)
+    instructions = Column(Text)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # Relationships
+    videos = relationship("ExerciseVideo", back_populates="exercise")
+    tips = relationship("ExerciseTip", back_populates="exercise")
+
+class ExerciseVideo(Base):
+    __tablename__ = "exercise_videos"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    exercise_id = Column(Integer, ForeignKey("exercises.id"))
+    youtube_url = Column(String, nullable=False)
+    title = Column(String)
+    thumbnail_url = Column(String)
+    duration = Column(Integer)  # seconds
+    popularity_score = Column(Float, default=0.0)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # Relationships
+    exercise = relationship("Exercise", back_populates="videos")
+    preferences = relationship("VideoPreference", back_populates="video")
+
+class WorkoutPlan(Base):
+    __tablename__ = "workout_plans"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"))
+    name = Column(String, nullable=False)
+    description = Column(Text)
+    exercises = Column(JSON, default=list)
+    difficulty = Column(String)
+    estimated_duration = Column(Integer)  # minutes
+    ai_generated = Column(Boolean, default=False)
+    ai_model = Column(String)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # Relationships
+    user = relationship("User", back_populates="workout_plans")
+
+class WorkoutLog(Base):
+    __tablename__ = "workout_logs"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"))
+    workout_plan_id = Column(Integer, ForeignKey("workout_plans.id"), nullable=True)
+    exercises_completed = Column(JSON, default=list)
+    duration_minutes = Column(Integer)
+    notes = Column(Text)
+    workout_date = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # Relationships
+    user = relationship("User", back_populates="workout_logs")
+
+class MealPlan(Base):
+    __tablename__ = "meal_plans"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"))
+    name = Column(String, nullable=False)
+    target_calories = Column(Integer)
+    target_protein = Column(Float)
+    target_carbs = Column(Float)
+    target_fat = Column(Float)
+    meals = Column(JSON, default=dict)
+    ai_generated = Column(Boolean, default=False)
+    ai_model = Column(String)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # Relationships
+    user = relationship("User", back_populates="meal_plans")
+
+class ExerciseTip(Base):
+    __tablename__ = "exercise_tips"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    exercise_id = Column(Integer, ForeignKey("exercises.id"))
+    title = Column(String, nullable=False)
+    content = Column(Text, nullable=False)
+    tip_type = Column(String)  # form, breathing, progression, etc.
+    popularity_score = Column(Float, default=0.0)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # Relationships
+    exercise = relationship("Exercise", back_populates="tips")
+    interactions = relationship("TipInteraction", back_populates="tip")
+
+class TipInteraction(Base):
+    __tablename__ = "tip_interactions"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"))
+    tip_id = Column(Integer, ForeignKey("exercise_tips.id"))
+    interaction_type = Column(String)  # like, dislike
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # Relationships
+    user = relationship("User", back_populates="tip_interactions")
+    tip = relationship("ExerciseTip", back_populates="interactions")
+
+class VideoPreference(Base):
+    __tablename__ = "video_preferences"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"))
+    video_id = Column(Integer, ForeignKey("exercise_videos.id"))
+    preference = Column(String)  # like, dislike
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # Relationships
+    user = relationship("User", back_populates="video_preferences")
+    video = relationship("ExerciseVideo", back_populates="preferences")
