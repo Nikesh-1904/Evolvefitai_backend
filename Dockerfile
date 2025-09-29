@@ -20,4 +20,5 @@ RUN chmod +x /entrypoint.sh
 EXPOSE 8000
 
 # Use the custom entrypoint
-ENTRYPOINT ["/entrypoint.sh"]
+ENTRYPOINT ["/bin/sh", "/entrypoint.sh"]
+
