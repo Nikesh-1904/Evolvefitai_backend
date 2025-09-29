@@ -3,7 +3,7 @@ import uuid
 from typing import Optional
 from fastapi import Depends, Request
 from fastapi_users import BaseUserManager, FastAPIUsers, UUIDIDMixin
-from fastapi_users.authentication import AuthenticationBackend, BearerTransport, JWTAuthentication
+from fastapi_users.authentication import AuthenticationBackend, BearerTransport, JWTStrategy
 from fastapi_users.db import SQLAlchemyUserDatabase
 from httpx_oauth.clients.google import GoogleOAuth2
 
@@ -12,6 +12,7 @@ from app.core.database import get_async_session
 from app.models import User, OAuthAccount
 
 SECRET = settings.SECRET_KEY
+
 
 class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
     reset_password_token_secret = SECRET
@@ -37,28 +38,27 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
     ):
         print(f"User {user.id} logged in.")
 
+
 async def get_user_db(session=Depends(get_async_session)):
     yield SQLAlchemyUserDatabase(session, User, OAuthAccount)
+
 
 async def get_user_manager(user_db=Depends(get_user_db)):
     yield UserManager(user_db)
 
-# JWT Authentication setup compatible with FastAPI-Users 12.1.2
-bearer_transport = BearerTransport(tokenUrl="auth/jwt/login")
 
-jwt_authentication = JWTAuthentication(
-    secret=SECRET,
-    lifetime_seconds=3600 * 24,  # 24 hours
-    tokenUrl="auth/jwt/login",
-)
+def get_jwt_strategy() -> JWTStrategy:
+    return JWTStrategy(secret=SECRET, lifetime_seconds=3600 * 24)  # 24 hours
+
+
+bearer_transport = BearerTransport(tokenUrl="auth/jwt/login")
 
 auth_backend = AuthenticationBackend(
     name="jwt",
     transport=bearer_transport,
-    get_strategy=lambda: jwt_authentication,
+    get_strategy=get_jwt_strategy,
 )
 
-# Google OAuth client setup
 if settings.GOOGLE_CLIENT_ID and settings.GOOGLE_CLIENT_SECRET:
     google_oauth_client = GoogleOAuth2(
         client_id=settings.GOOGLE_CLIENT_ID,
@@ -66,6 +66,7 @@ if settings.GOOGLE_CLIENT_ID and settings.GOOGLE_CLIENT_SECRET:
     )
 else:
     google_oauth_client = None
+
 
 fastapi_users = FastAPIUsers[User, uuid.UUID](get_user_manager, [auth_backend])
 
