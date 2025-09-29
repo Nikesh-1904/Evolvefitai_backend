@@ -1,10 +1,15 @@
+# app/schemas.py
 from pydantic import BaseModel, EmailStr
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 import uuid
 
-# User schemas (extending FastAPI Users)
-class UserRead(BaseModel):
+# --- CHANGE 1: ADD THIS IMPORT ---
+from fastapi_users.schemas import BaseUserCreate, BaseUserRead, BaseUserUpdate
+
+# --- CHANGE 2: MODIFY THE UserRead SCHEMA ---
+# It now inherits from BaseUserRead instead of BaseModel
+class UserRead(BaseUserRead):
     id: uuid.UUID
     email: EmailStr
     username: Optional[str] = None
@@ -24,13 +29,18 @@ class UserRead(BaseModel):
     class Config:
         from_attributes = True
 
-class UserCreate(BaseModel):
+# --- CHANGE 3: MODIFY THE UserCreate SCHEMA ---
+# It now inherits from BaseUserCreate instead of BaseModel.
+# This is the change that fixes the 'create_update_dict' error.
+class UserCreate(BaseUserCreate):
     email: EmailStr
     password: str
     username: Optional[str] = None
     full_name: Optional[str] = None
 
-class UserUpdate(BaseModel):
+# --- CHANGE 4: MODIFY THE UserUpdate SCHEMA ---
+# It now inherits from BaseUserUpdate instead of BaseModel
+class UserUpdate(BaseUserUpdate):
     username: Optional[str] = None
     full_name: Optional[str] = None
     age: Optional[int] = None
@@ -41,6 +51,10 @@ class UserUpdate(BaseModel):
     experience_level: Optional[str] = None
     activity_level: Optional[str] = None
     dietary_restrictions: Optional[List[str]] = None
+
+# -------------------------------------------------------------------
+# NO CHANGES NEEDED FOR THE REST OF THE FILE
+# -------------------------------------------------------------------
 
 # Exercise schemas
 class ExerciseBase(BaseModel):
