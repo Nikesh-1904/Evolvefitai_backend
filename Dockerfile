@@ -20,5 +20,6 @@ RUN chmod +x /entrypoint.sh
 EXPOSE 8000
 
 # Use the custom entrypoint
-ENTRYPOINT ["/bin/sh", "/entrypoint.sh"]
+CMD ["python", "app/main.py"]
+
 
