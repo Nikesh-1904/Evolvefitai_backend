@@ -2,9 +2,10 @@ from pydantic import BaseModel, EmailStr
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 import uuid
+from fastapi_users import schemas  # Add this line
 
 # User schemas are now correctly inheriting from BaseModel
-class UserRead(BaseModel):
+class UserRead(schemas.BaseUser[uuid.UUID]):
     id: uuid.UUID
     email: EmailStr
     username: Optional[str] = None
@@ -24,13 +25,13 @@ class UserRead(BaseModel):
     class Config:
         from_attributes = True
 
-class UserCreate(BaseModel):
+class UserCreate(schemas.BaseUserCreate):
     email: EmailStr
     password: str
     username: Optional[str] = None
     full_name: Optional[str] = None
 
-class UserUpdate(BaseModel):
+class UserUpdate(schemas.BaseUserUpdate):
     username: Optional[str] = None
     full_name: Optional[str] = None
     age: Optional[int] = None
@@ -41,10 +42,6 @@ class UserUpdate(BaseModel):
     experience_level: Optional[str] = None
     activity_level: Optional[str] = None
     dietary_restrictions: Optional[List[str]] = []
-
-# -------------------------------------------------------------------
-# NO CHANGES in the rest of the file
-# -------------------------------------------------------------------
 
 # Exercise schemas
 class ExerciseBase(BaseModel):
