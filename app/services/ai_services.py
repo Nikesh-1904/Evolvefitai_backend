@@ -23,10 +23,9 @@ class GroqAI:
         # FIXED: Updated to current available model
         self.model = "llama3-8b-8192"  # This was deprecated, let's use updated model
         self.available_models = [
-            "llama-3.1-70b-versatile",
-            "llama-3.1-8b-instant", 
-            "mixtral-8x7b-32768",
-            "gemma-7b-it"
+            "llama-3.3-70b-versatile", # High-power replacement
+            "llama-3.1-8b-instant",     # Fast and reliable
+            "openai/gpt-oss-120b"      
         ]
 
     def generate_text(self, prompt: str, max_tokens: int = 500) -> Optional[str]:
@@ -91,9 +90,9 @@ class HuggingFaceAI:
         
         # Alternative models to try
         self.backup_models = [
-            "microsoft/DialoGPT-medium",
-            "facebook/blenderbot-400M-distill",
-            "google/flan-t5-base"
+            "meta-llama/Meta-Llama-3-8B-Instruct",
+            "google/gemma-2-9b-it",
+            "HuggingFaceH4/zephyr-7b-beta" 
         ]
 
     def generate_text(self, prompt: str, max_length: int = 500) -> Optional[str]:
@@ -216,7 +215,7 @@ class OpenRouterAI:
             "HTTP-Referer": "https://evolvefitai.com",
             "X-Title": "EvolveFit AI"
         }
-        self.model = "meta-llama/llama-3.1-8b-instruct:free"  # Free tier
+        self.model = "deepseek/deepseek-v3-1:free"  # Free tier
 
     def generate_text(self, prompt: str, max_tokens: int = 500) -> Optional[str]:
         """Generate text using OpenRouter's free tier"""
