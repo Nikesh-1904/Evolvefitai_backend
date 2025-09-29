@@ -1,4 +1,3 @@
-# app/core/auth.py
 import uuid
 from typing import Optional
 from fastapi import Depends, Request
@@ -45,7 +44,7 @@ def get_jwt_strategy() -> JWTStrategy:
     return JWTStrategy(secret=SECRET, lifetime_seconds=3600)
 
 
-bearer_transport = BearerTransport(tokenUrl="auth/jwt/login")
+bearer_transport = BearerTransport(tokenUrl="auth/login") # Corrected from /auth/jwt/login
 
 auth_backend = AuthenticationBackend(
     name="jwt",
@@ -55,9 +54,15 @@ auth_backend = AuthenticationBackend(
 
 # Google OAuth2 client setup if keys provided
 if settings.GOOGLE_CLIENT_ID and settings.GOOGLE_CLIENT_SECRET:
+    # --- THIS IS THE CORRECTED SECTION ---
+    # We explicitly define the redirect_uri to prevent misinterpretation by proxies.
+    redirect_uri = f"{settings.BACKEND_URL}/api/v1/auth/google/callback"
+    
     google_oauth_client = GoogleOAuth2(
         client_id=settings.GOOGLE_CLIENT_ID,
         client_secret=settings.GOOGLE_CLIENT_SECRET,
+        redirect_uri=redirect_uri,
+        name="google" # Add name for multi-provider support
     )
 else:
     google_oauth_client = None
