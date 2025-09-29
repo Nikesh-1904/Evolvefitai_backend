@@ -1,3 +1,5 @@
+# Version 1.1 - Forcing a fresh dependency install
+
 alembic==1.12.1
 annotated-types==0.7.0
 anyio==3.7.1
