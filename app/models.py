@@ -8,39 +8,46 @@ from typing import List
 
 from app.core.database import Base
 
-# --- NEW OAUTH ACCOUNT MODEL ---
-# This class defines the oauth_accounts table required by fastapi-users
-class OAuthAccount(SQLAlchemyBaseOAuthAccountTableUUID, Base):
-    pass
-
+# --- The User model is now defined BEFORE the OAuthAccount model ---
 class User(SQLAlchemyBaseUserTableUUID, Base):
     """User model with FastAPI Users integration"""
     __tablename__ = "users"
     
-    # ... (all your existing columns are here, no changes)
+    # FastAPI Users provides: id (UUID), email, hashed_password, is_active, is_superuser, is_verified
+    
+    # Additional profile fields
     username = Column(String, unique=True, index=True)
     full_name = Column(String)
+    
+    # Fitness profile
     age = Column(Integer)
-    weight = Column(Float)
-    height = Column(Float)
+    weight = Column(Float)  # kg
+    height = Column(Float)  # cm
     gender = Column(String)
     fitness_goal = Column(String)
     experience_level = Column(String)
     activity_level = Column(String)
+    
+    # Preferences
     dietary_restrictions = Column(JSON, default=list)
+    
+    # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     
-    # --- ADDED RELATIONSHIP TO OAUTHACCOUNTS ---
-    # This line links your User model to the new OAuthAccount model
-    oauth_accounts: Mapped[List[OAuthAccount]] = relationship(lazy="joined")
-
-    # Relationships to your other tables (no changes here)
+    # This relationship links the User to the OAuthAccount model below
+    oauth_accounts: Mapped[List["OAuthAccount"]] = relationship(lazy="joined")
+    
+    # Relationships to your other tables
     workout_logs = relationship("WorkoutLog", back_populates="user")
     workout_plans = relationship("WorkoutPlan", back_populates="user")
     meal_plans = relationship("MealPlan", back_populates="user")
     tip_interactions = relationship("TipInteraction", back_populates="user")
     video_preferences = relationship("VideoPreference", back_populates="user")
+
+# --- This model now comes AFTER the User model ---
+class OAuthAccount(SQLAlchemyBaseOAuthAccountTableUUID, Base):
+    pass
 
 
 # ... (The rest of your models file remains exactly the same) ...
@@ -158,3 +165,4 @@ class VideoPreference(Base):
     
     user = relationship("User", back_populates="video_preferences")
     video = relationship("ExerciseVideo", back_populates="preferences")
+
