@@ -9,7 +9,8 @@ from httpx_oauth.clients.google import GoogleOAuth2
 
 from app.core.config import settings
 from app.core.database import get_async_session
-from app.models import User
+# --- IMPORT THE NEW OAUTHACCOUNT MODEL ---
+from app.models import User, OAuthAccount
 
 SECRET = settings.SECRET_KEY
 
@@ -33,7 +34,9 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
 
 
 async def get_user_db(session=Depends(get_async_session)):
-    yield SQLAlchemyUserDatabase(session, User)
+    # --- UPDATE THE DATABASE ADAPTER ---
+    # Pass the OAuthAccount model to the user database
+    yield SQLAlchemyUserDatabase(session, User, OAuthAccount)
 
 
 async def get_user_manager(user_db=Depends(get_user_db)):
@@ -44,7 +47,6 @@ def get_jwt_strategy() -> JWTStrategy:
     return JWTStrategy(secret=SECRET, lifetime_seconds=3600)
 
 
-# Note: The tokenUrl should match the route we fixed earlier in api/v1/auth.py
 bearer_transport = BearerTransport(tokenUrl="auth/login")
 
 auth_backend = AuthenticationBackend(
@@ -53,9 +55,7 @@ auth_backend = AuthenticationBackend(
     get_strategy=get_jwt_strategy,
 )
 
-# Google OAuth2 client setup if keys provided
 if settings.GOOGLE_CLIENT_ID and settings.GOOGLE_CLIENT_SECRET:
-    # This section is now reverted to its correct state for your library version
     google_oauth_client = GoogleOAuth2(
         client_id=settings.GOOGLE_CLIENT_ID,
         client_secret=settings.GOOGLE_CLIENT_SECRET,
