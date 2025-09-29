@@ -1,4 +1,4 @@
-# app/services/ai_services.py - Complete Fixed Version with Updated Models
+# app/services/ai_services.py - Complete Fixed Version with Updated Models and Compatible Export
 
 import json
 import requests
@@ -6,6 +6,7 @@ import random
 import numpy as np
 import logging
 import re
+import time
 from typing import Dict, List, Any, Optional
 from datetime import datetime, timedelta
 from app.core.config import settings
@@ -439,7 +440,7 @@ class RuleBasedWorkoutGenerator:
         }
         workout_name = workout_names.get(goal, f"{level.capitalize()} Workout")
         
-        logger.success(f"✅ Rule-based: Generated {len(selected_exercises)} exercises")
+        logger.info(f"✅ Rule-based: Generated {len(selected_exercises)} exercises")
         
         return {
             "name": workout_name,
@@ -462,8 +463,6 @@ class RuleBasedWorkoutGenerator:
 
 
 # Main AI Workout Service
-import time
-
 class AIWorkoutService:
     """Main service coordinating all AI providers with fallback chain"""
     
@@ -529,7 +528,7 @@ Output ONLY this JSON format:
                 workout_data = self.groq_ai.safe_json_extract(raw_response)
                 if workout_data and "exercises" in workout_data:
                     groq_end = time.time()
-                    logger.success(f"🎉 SUCCESS: Groq AI generated workout in {groq_end - groq_start:.2f}s")
+                    logger.info(f"🎉 SUCCESS: Groq AI generated workout in {groq_end - groq_start:.2f}s")
                     workout_data.update({
                         "ai_generated": True,
                         "ai_model": "Groq AI",
@@ -551,16 +550,16 @@ Output ONLY this JSON format:
         try:
             openrouter_response = self.openrouter_ai.generate_text(prompt)
             if openrouter_response:
-                workout_data = json.loads(openrouter_response)
-                if "exercises" in workout_data:
-                    logger.success("🎉 SUCCESS: OpenRouter AI generated workout")
+                workout_data = self.groq_ai.safe_json_extract(openrouter_response)
+                if workout_data and "exercises" in workout_data:
+                    logger.info("🎉 SUCCESS: OpenRouter AI generated workout")
                     workout_data.update({
                         "ai_generated": True,
                         "ai_model": "OpenRouter AI"
                     })
                     return workout_data
-        except:
-            pass
+        except Exception as e:
+            logger.error(f"❌ OpenRouter: Generation failed: {str(e)}")
         
         logger.warning("⚠️ OpenRouter AI failed, trying next method...")
         
@@ -573,14 +572,14 @@ Output ONLY this JSON format:
                 # Try to extract JSON from the response
                 workout_data = self.groq_ai.safe_json_extract(hf_response)
                 if workout_data and "exercises" in workout_data:
-                    logger.success("🎉 SUCCESS: HuggingFace AI generated workout")
+                    logger.info("🎉 SUCCESS: HuggingFace AI generated workout")
                     workout_data.update({
                         "ai_generated": True,
                         "ai_model": "HuggingFace AI"
                     })
                     return workout_data
-        except:
-            pass
+        except Exception as e:
+            logger.error(f"❌ HuggingFace: Generation failed: {str(e)}")
         
         logger.warning("⚠️ HuggingFace AI failed, trying next method...")
         
@@ -592,14 +591,14 @@ Output ONLY this JSON format:
             if ollama_response:
                 workout_data = self.groq_ai.safe_json_extract(ollama_response)
                 if workout_data and "exercises" in workout_data:
-                    logger.success("🎉 SUCCESS: Ollama AI generated workout")
+                    logger.info("🎉 SUCCESS: Ollama AI generated workout")
                     workout_data.update({
                         "ai_generated": True,
                         "ai_model": "Ollama AI"
                     })
                     return workout_data
-        except:
-            pass
+        except Exception as e:
+            logger.error(f"❌ Ollama: Generation failed: {str(e)}")
         
         logger.warning("⚠️ Ollama AI failed, using fallback...")
         
@@ -610,7 +609,7 @@ Output ONLY this JSON format:
             workout_data = self.rule_based.generate_workout(goal, level, duration)
             rule_end = time.time()
             
-            logger.success(f"🎉 SUCCESS: Rule-based system generated workout in {rule_end - rule_start:.2f}s")
+            logger.info(f"🎉 SUCCESS: Rule-based system generated workout in {rule_end - rule_start:.2f}s")
             
             end_time = time.time()
             total_time = end_time - start_time
@@ -622,7 +621,7 @@ Output ONLY this JSON format:
             })
             
             logger.info("=" * 80)
-            logger.success("✅ WORKOUT GENERATION COMPLETED")
+            logger.info("✅ WORKOUT GENERATION COMPLETED")
             logger.info(f"🤖 Generation Method: {workout_data.get('ai_model', 'Rule-based System')}")
             logger.info(f"⏱️ Generation Time: {workout_data.get('generation_time', 0):.2f}s")
             logger.info(f"🕐 Total Process Time: {total_time:.2f}s")
@@ -651,6 +650,41 @@ Output ONLY this JSON format:
                 "ai_model": "Emergency Fallback"
             }
 
+    # Compatibility method for existing code that expects async
+    async def generate_workout_async(self, user, duration_minutes: int) -> Dict:
+        """Async wrapper for compatibility with existing code"""
+        # Default parameters based on user preferences or defaults
+        goal = getattr(user, 'fitness_goal', 'muscle_gain')
+        level = getattr(user, 'fitness_level', 'intermediate')
+        
+        # Call the sync method
+        result = self.generate_workout(goal, level, duration_minutes)
+        
+        # Add required fields for compatibility
+        result.update({
+            "description": f"AI-generated {goal} workout for {level} level",
+            "estimated_duration": duration_minutes
+        })
+        
+        return result
 
-# Initialize the service
+
+# Create the service instances - BOTH for compatibility
 ai_workout_service = AIWorkoutService()
+
+# Legacy alias for existing imports
+ai_workout_generator = ai_workout_service
+
+# Also create async-compatible wrapper class
+class AsyncAIWorkoutGenerator:
+    """Async wrapper for backwards compatibility"""
+    
+    def __init__(self):
+        self.service = ai_workout_service
+    
+    async def generate_workout(self, user, duration_minutes: int) -> Dict:
+        """Generate workout with async compatibility"""
+        return await self.service.generate_workout_async(user, duration_minutes)
+
+# Create async instance
+async_ai_workout_generator = AsyncAIWorkoutGenerator()
