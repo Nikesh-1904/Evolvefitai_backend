@@ -5,7 +5,7 @@ from app.api.v1.api import api_router
 from app.core.database import create_db_and_tables
 
 app = FastAPI(
-    title=settings.PROJECT_NAME,
+    title=settings.PROJECTNAME,
     version=settings.VERSION,
     description="EvolveFit AI - Your Intelligent Fitness Companion with AI-powered workouts, meal planning, and plateau detection"
 )
