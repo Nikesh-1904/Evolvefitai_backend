@@ -11,7 +11,8 @@ if echo "$DATABASE_URL" | grep -q "^sqlite://"; then
   export DATABASE_URL=$(echo "$DATABASE_URL" | sed 's#sqlite:///#sqlite+aiosqlite:///#!')
 fi
 
-if echo "$DATABASE_L" | grep -q "^postgresql://"; then
+# Corrected a typo here from "$DATABASE_L" to "$DATABASE_URL"
+if echo "$DATABASE_URL" | grep -q "^postgresql://"; then
   export DATABASE_URL=$(echo "$DATABASE_URL" | sed 's#postgresql:#postgresql+asyncpg:#')
 fi
 
@@ -21,6 +22,7 @@ alembic upgrade head
 echo "Starting uvicorn"
 echo "Port is set to: $PORT"
 
-# The --proxy-headers flag is added to tell Uvicorn to trust the headers
-# sent by Railway's proxy, which allows it to generate correct URLs.
-exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --proxy-headers
+# The --forwarded-allow-ips='*' flag is added to fully trust the proxy,
+# ensuring the application generates the correct https:// callback URL.
+exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --proxy-headers --forwarded-allow-ips='*'
+
