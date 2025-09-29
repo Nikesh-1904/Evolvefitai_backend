@@ -1,4 +1,4 @@
-# app/services/ai_services.py - Complete Fixed Version with Updated Models and Compatible Export
+# app/services/ai_services.py - FINAL CORRECTED VERSION - Proper Async Compatibility
 
 import json
 import requests
@@ -7,6 +7,7 @@ import numpy as np
 import logging
 import re
 import time
+import asyncio
 from typing import Dict, List, Any, Optional
 from datetime import datetime, timedelta
 from app.core.config import settings
@@ -506,8 +507,8 @@ Output ONLY this JSON format:
         
         return prompt
     
-    def generate_workout(self, goal: str, level: str, duration: int = 30, preferences: Dict = None) -> Dict:
-        """Generate workout using AI providers with fallback chain"""
+    def generate_workout_sync(self, goal: str, level: str, duration: int = 30, preferences: Dict = None) -> Dict:
+        """Generate workout using AI providers with fallback chain - SYNCHRONOUS"""
         start_time = time.time()
         
         logger.info("=" * 80)
@@ -650,17 +651,27 @@ Output ONLY this JSON format:
                 "ai_model": "Emergency Fallback"
             }
 
-    # Compatibility method for existing code that expects async
-    async def generate_workout_async(self, user, duration_minutes: int) -> Dict:
-        """Async wrapper for compatibility with existing code"""
-        # Default parameters based on user preferences or defaults
+    # ASYNC METHOD - This is what your ai.py expects
+    async def generate_workout(self, user, duration_minutes: int) -> Dict:
+        """Async wrapper that matches your ai.py expectations - CORRECTED SIGNATURE"""
+        logger.info("🧠 Starting AI workout generation process...")
+        
+        # Extract user details safely
         goal = getattr(user, 'fitness_goal', 'muscle_gain')
         level = getattr(user, 'fitness_level', 'intermediate')
         
-        # Call the sync method
-        result = self.generate_workout(goal, level, duration_minutes)
+        # Run the synchronous generation in a thread to avoid blocking
+        loop = asyncio.get_event_loop()
+        result = await loop.run_in_executor(
+            None, 
+            self.generate_workout_sync,
+            goal,
+            level, 
+            duration_minutes,
+            None
+        )
         
-        # Add required fields for compatibility
+        # Add required fields for compatibility with your ai.py
         result.update({
             "description": f"AI-generated {goal} workout for {level} level",
             "estimated_duration": duration_minutes
@@ -672,19 +683,12 @@ Output ONLY this JSON format:
 # Create the service instances - BOTH for compatibility
 ai_workout_service = AIWorkoutService()
 
-# Legacy alias for existing imports
+# *** CRITICAL FIX: This is the exact object your ai.py imports ***
 ai_workout_generator = ai_workout_service
 
-# Also create async-compatible wrapper class
-class AsyncAIWorkoutGenerator:
-    """Async wrapper for backwards compatibility"""
-    
-    def __init__(self):
-        self.service = ai_workout_service
-    
-    async def generate_workout(self, user, duration_minutes: int) -> Dict:
-        """Generate workout with async compatibility"""
-        return await self.service.generate_workout_async(user, duration_minutes)
+# Debug: Log what we're exporting
+logger.info(f"🔧 ai_workout_generator type: {type(ai_workout_generator)}")
+logger.info(f"🔧 ai_workout_generator.generate_workout callable: {callable(getattr(ai_workout_generator, 'generate_workout', None))}")
 
-# Create async instance
-async_ai_workout_generator = AsyncAIWorkoutGenerator()
+# Also make sure it's definitely available at module level
+__all__ = ['ai_workout_generator', 'ai_workout_service', 'AIWorkoutService']
