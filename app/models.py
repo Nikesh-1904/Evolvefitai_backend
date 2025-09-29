@@ -47,7 +47,10 @@ class User(SQLAlchemyBaseUserTableUUID, Base):
 
 # --- This model now comes AFTER the User model ---
 class OAuthAccount(SQLAlchemyBaseOAuthAccountTableUUID, Base):
-    pass
+    # --- THIS IS THE FIX ---
+    # We explicitly define user_id to override the default from the mixin
+    # and point it to the correct "users" table.
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
 
 
 # ... (The rest of your models file remains exactly the same) ...
