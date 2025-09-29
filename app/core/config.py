@@ -32,7 +32,8 @@ class Settings(BaseSettings):
     YOUTUBE_API_KEY: str = os.getenv("YOUTUBE_API_KEY", "")  # NEW
     
     # App Settings
-    APP_NAME: str = "EvolveFit AI"
+    PROJECT_NAME: str = "EvolveFit AI"
+    VERSION: str = "1.0.0"
     DEBUG: bool = os.getenv("DEBUG", "False").lower() == "true"
 
     class Config:
