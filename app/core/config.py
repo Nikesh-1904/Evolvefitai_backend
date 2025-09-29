@@ -16,6 +16,10 @@ class Settings(BaseSettings):
     # Frontend URL for CORS
     FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost:3000")
     
+    # --- THIS IS THE NEW LINE ---
+    # Backend URL for constructing OAuth callback URLs
+    BACKEND_URL: str = os.getenv("BACKEND_URL", "http://localhost:8000")
+    
     # Google OAuth
     GOOGLE_CLIENT_ID: str = os.getenv("GOOGLE_CLIENT_ID", "")
     GOOGLE_CLIENT_SECRET: str = os.getenv("GOOGLE_CLIENT_SECRET", "")
@@ -33,3 +37,4 @@ class Settings(BaseSettings):
         case_sensitive = True
 
 settings = Settings()
+
