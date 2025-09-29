@@ -29,7 +29,7 @@ class User(SQLAlchemyBaseUserTableUUID, Base):
     activity_level = Column(String)
     
     # Preferences
-    dietary_restrictions = Column(JSON, default=list)
+    dietary_restrictions = Column(JSON, default=[])
     
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())

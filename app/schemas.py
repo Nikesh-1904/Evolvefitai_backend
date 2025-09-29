@@ -40,7 +40,7 @@ class UserUpdate(BaseModel):
     fitness_goal: Optional[str] = None
     experience_level: Optional[str] = None
     activity_level: Optional[str] = None
-    dietary_restrictions: Optional[List[str]] = None
+    dietary_restrictions: Optional[List[str]] = []
 
 # -------------------------------------------------------------------
 # NO CHANGES in the rest of the file
