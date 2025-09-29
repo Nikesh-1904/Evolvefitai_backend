@@ -10,18 +10,23 @@ from app.core.auth import get_user_manager
 router = APIRouter()
 
 # JWT auth routes
+# The prefix="/jwt" has been REMOVED from this section.
+# This makes the login URL .../auth/login (Correct)
+# instead of .../auth/jwt/login (Incorrectly nested)
 router.include_router(
-    fastapi_users.get_auth_router(auth_backend), prefix="/jwt", tags=["auth"]
+    fastapi_users.get_auth_router(auth_backend), tags=["auth"]
 )
 
 # Registration routes
+# The prefix="/register" has been REMOVED from this section.
+# This fixes the 404 error.
 router.include_router(
     fastapi_users.get_register_router(UserRead, UserCreate),
-    prefix="/register",
     tags=["auth"],
 )
 
 # User management routes
+# This prefix is correct because you likely want the route to be /users/me etc.
 router.include_router(
     fastapi_users.get_users_router(UserRead, UserUpdate),
     prefix="/users",
@@ -32,8 +37,8 @@ router.include_router(
 if google_oauth_client:
     router.include_router(
         fastapi_users.get_oauth_router(
-            google_oauth_client, 
-            auth_backend, 
+            google_oauth_client,
+            auth_backend,
             settings.SECRET_KEY,
             associate_by_email=True,
             is_verified_by_default=True,
