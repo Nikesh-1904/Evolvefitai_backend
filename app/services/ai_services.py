@@ -1,4 +1,4 @@
-# app/services/ai_services.py - FINAL CORRECTED VERSION - Proper Async Compatibility
+# app/services/ai_services.py
 
 import json
 import requests
@@ -474,50 +474,69 @@ class AIWorkoutService:
         self.ollama_ai = OllamaAI()
         self.rule_based = RuleBasedWorkoutGenerator()
     
-    def create_ai_prompt(self, goal: str, level: str, duration: int, preferences: Dict = None) -> str:
-        """Create optimized prompt for AI workout generation"""
-        prompt = f"""Generate a {duration}-minute {goal} workout for {level} level.
+    # --- THIS FUNCTION IS UPDATED ---
+    def create_ai_prompt(
+        self,
+        goal: str,
+        level: str,
+        duration: int,
+        preferences: Dict = None,
+        target_muscles: Optional[List[str]] = None
+    ) -> str:
+        """Create optimized prompt for AI workout generation with muscle targeting."""
+        
+        # Start building the prompt
+        prompt = f"Generate a {duration}-minute workout. The user's primary goal is '{goal}' and their fitness level is '{level}'."
+        
+        # Add muscle group targeting if provided
+        if target_muscles:
+            muscle_list = ", ".join(target_muscles)
+            prompt += f"\nCRITICAL: The workout MUST primarily focus on the following muscle groups: {muscle_list}."
+        
+        prompt += """
 
 Requirements:
-- Goal: {goal}
-- Fitness Level: {level}
-- Duration: {duration} minutes
-- Number of Exercises depends on Fitness level and Goal
-- Provide sets and reps for each exercise
-- Provide Description on how to Perform the Exercise
+- Provide a creative and motivating name for the workout.
+- The number of exercises should be appropriate for the duration and fitness level.
+- Provide a brief description of the overall workout.
+- For EACH exercise, provide the following details: name, sets, reps, instructions, and a list of primary muscle_groups targeted.
 
-Output ONLY this JSON format:
+Output ONLY the following JSON format. Do NOT include any text before or after the JSON object.
 {{
     "name": "Workout Name",
-    "goal": "{goal}",
-    "difficulty": "{level}",
-    "duration": {duration},
+    "description": "A brief overview of the workout.",
+    "difficulty_level": "{level}",
+    "estimated_duration": {duration},
+    "estimated_calories": 250,
     "exercises": [
         {{
             "name": "Exercise Name",
             "sets": 3,
             "reps": "8-12",
-            "description": "How to perform this exercise"
+            "instructions": "Detailed instructions on how to perform this exercise.",
+            "muscle_groups": ["chest", "triceps"]
         }}
-    ],
-    "estimated_calories": 250
+    ]
 }}"""
         
         if preferences:
-            prompt += f"\nPreferences: {preferences}"
+            prompt += f"\nUser Preferences: {preferences}"
         
         return prompt
-    
-    def generate_workout_sync(self, goal: str, level: str, duration: int = 30, preferences: Dict = None) -> Dict:
+
+    def generate_workout_sync(self, goal: str, level: str, duration: int = 30, preferences: Dict = None, target_muscles: Optional[List[str]] = None) -> Dict:
         """Generate workout using AI providers with fallback chain - SYNCHRONOUS"""
         start_time = time.time()
         
         logger.info("=" * 80)
         logger.info("🏋️ STARTING AI WORKOUT GENERATION")
         logger.info(f"🎯 Goal: {goal} | Level: {level} | Duration: {duration}min")
+        if target_muscles:
+            logger.info(f"💪 Targeting: {', '.join(target_muscles)}")
         logger.info("=" * 80)
         
-        prompt = self.create_ai_prompt(goal, level, duration, preferences)
+        # Pass target_muscles to the prompt creator
+        prompt = self.create_ai_prompt(goal, level, duration, preferences, target_muscles)
         
         # Method 1: Try Groq AI first
         logger.info("🔄 Attempting Method 1: Groq AI (Fastest)")
@@ -652,16 +671,14 @@ Output ONLY this JSON format:
                 "ai_model": "Emergency Fallback"
             }
 
-    # ASYNC METHOD - This is what your ai.py expects
-    async def generate_workout(self, user, duration_minutes: int) -> Dict:
-        """Async wrapper that matches your ai.py expectations - CORRECTED SIGNATURE"""
+    # --- THIS FUNCTION IS UPDATED ---
+    async def generate_workout(self, user, duration_minutes: int, target_muscles: Optional[List[str]] = None) -> Dict:
+        """Async wrapper that now accepts target_muscles."""
         logger.info("🧠 Starting AI workout generation process...")
         
-        # Extract user details safely
         goal = getattr(user, 'fitness_goal', 'muscle_gain')
         level = getattr(user, 'fitness_level', 'intermediate')
         
-        # Run the synchronous generation in a thread to avoid blocking
         loop = asyncio.get_event_loop()
         result = await loop.run_in_executor(
             None, 
@@ -669,10 +686,10 @@ Output ONLY this JSON format:
             goal,
             level, 
             duration_minutes,
-            None
+            None,
+            target_muscles  # Pass the new argument
         )
         
-        # Add required fields for compatibility with your ai.py
         result.update({
             "description": f"AI-generated {goal} workout for {level} level",
             "estimated_duration": duration_minutes

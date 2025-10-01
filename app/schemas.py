@@ -1,8 +1,10 @@
+# app/schemas.py
+
 from pydantic import BaseModel, EmailStr
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 import uuid
-from fastapi_users import schemas  # Add this line
+from fastapi_users import schemas
 
 # User schemas are now correctly inheriting from BaseModel
 class UserRead(schemas.BaseUser[uuid.UUID]):
@@ -167,6 +169,8 @@ class VideoPreferenceCreate(BaseModel):
 class WorkoutGenerationRequest(BaseModel):
     user_preferences: Optional[Dict[str, Any]] = {}
     duration_minutes: Optional[int] = 45
+    # --- NEW FIELD ---
+    target_muscle_groups: Optional[List[str]] = None
 
 class PlateauAnalysis(BaseModel):
     is_plateau: bool
