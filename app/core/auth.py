@@ -1,8 +1,7 @@
 # app/core/auth.py
-
 import uuid
 from typing import Optional
-from fastapi import Depends, Request, Response  # <--- Make sure 'Response' is imported
+from fastapi import Depends, Request, Response  # <--- Import Response
 from fastapi_users import BaseUserManager, FastAPIUsers, UUIDIDMixin
 from fastapi_users.authentication import AuthenticationBackend, BearerTransport, JWTStrategy
 from fastapi_users.db import SQLAlchemyUserDatabase
@@ -31,14 +30,12 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
     ):
         print(f"Verification requested for user {user.id}. Token: {token}")
 
-    # --- THIS IS THE FIX ---
-    # The signature of on_after_login in fastapi-users v12 includes a `response` parameter.
-    # We simply need to add it to our custom function to match.
+    # --- FIX: Added the 'response' parameter to match the library's expectation ---
     async def on_after_login(
         self,
         user: User,
         request: Optional[Request] = None,
-        response: Optional[Response] = None,
+        response: Optional[Response] = None
     ):
         print(f"User {user.id} logged in.")
 
