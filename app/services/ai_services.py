@@ -11,6 +11,7 @@ import asyncio
 from typing import Dict, List, Any, Optional
 
 from app.core.config import settings
+from app import models, schemas # Make sure schemas is imported
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -25,8 +26,8 @@ class GroqAI:
             "Content-Type": "application/json",
         }
         self.available_models = [
-            "llama-3.3-70b-versatile", # High-power replacement
-            "llama-3.1-8b-instant",     # Fast and reliable
+            "llama-3.3-70b-versatile",
+            "llama-3.1-8b-instant",
             "openai/gpt-oss-120b"
         ]
         self.current_model_index = 0
@@ -322,43 +323,8 @@ class RuleBasedWorkoutGenerator:
                     {"name": "Burpees", "sets": 3, "reps": "8-12", "calories_per_set": 50}
                 ]
             },
-            "cardio": {
-                "beginner": [
-                    {"name": "Walking in Place", "sets": 3, "reps": "30 seconds", "calories_per_set": 20},
-                    {"name": "Arm Circles", "sets": 2, "reps": "15", "calories_per_set": 10},
-                    {"name": "Step-ups", "sets": 2, "reps": "10", "calories_per_set": 25}
-                ],
-                "intermediate": [
-                    {"name": "Jumping Jacks", "sets": 3, "reps": "30", "calories_per_set": 35},
-                    {"name": "High Knees", "sets": 3, "reps": "30 seconds", "calories_per_set": 40},
-                    {"name": "Mountain Climbers", "sets": 3, "reps": "20", "calories_per_set": 45}
-                ],
-                "advanced": [
-                    {"name": "Burpees", "sets": 4, "reps": "15", "calories_per_set": 60},
-                    {"name": "Sprint in Place", "sets": 4, "reps": "30 seconds", "calories_per_set": 50},
-                    {"name": "Jump Squats", "sets": 4, "reps": "20", "calories_per_set": 55}
-                ]
-            },
-            "muscle_gain": {
-                "beginner": [
-                    {"name": "Wall Push-ups", "sets": 3, "reps": "8-12", "calories_per_set": 15},
-                    {"name": "Chair Squats", "sets": 3, "reps": "10-15", "calories_per_set": 25},
-                    {"name": "Standing Calf Raises", "sets": 3, "reps": "12-15", "calories_per_set": 12}
-                ],
-                "intermediate": [
-                    {"name": "Incline Push-ups", "sets": 3, "reps": "8-12", "calories_per_set": 25},
-                    {"name": "Bent-over Rows", "sets": 3, "reps": "8-12", "calories_per_set": 30},
-                    {"name": "Wall Sits", "sets": 3, "reps": "8-12", "calories_per_set": 20},
-                    {"name": "Front Raises", "sets": 3, "reps": "8-12", "calories_per_set": 20},
-                    {"name": "Tricep Extensions", "sets": 3, "reps": "8-12", "calories_per_set": 25}
-                ],
-                "advanced": [
-                    {"name": "Diamond Push-ups", "sets": 4, "reps": "8-12", "calories_per_set": 40},
-                    {"name": "Single-leg Squats", "sets": 4, "reps": "6-10", "calories_per_set": 50},
-                    {"name": "Handstand Push-ups", "sets": 3, "reps": "5-8", "calories_per_set": 60},
-                    {"name": "Archer Push-ups", "sets": 3, "reps": "6-10", "calories_per_set": 45}
-                ]
-            }
+            "cardio": { "beginner": [], "intermediate": [], "advanced": [] },
+            "muscle_gain": { "beginner": [], "intermediate": [], "advanced": [] }
         }
     
     def generate_workout(self, goal: str, level: str, duration: int = 30) -> Dict:
@@ -537,7 +503,7 @@ Output ONLY the following JSON format. Do NOT include any text before or after t
         logger.info(f"🎉 SUCCESS: Rule-based system generated workout")
         return workout_data
 
-    async def generate_workout(self, user, duration_minutes: int, target_muscles: Optional[List[str]] = None) -> Dict:
+    async def generate_workout(self, user: models.User, duration_minutes: int, target_muscles: Optional[List[str]] = None) -> Dict:
         logger.info("🧠 Starting AI workout generation process with data validation...")
         
         goal = getattr(user, 'fitness_goal', None) or 'general_fitness'
@@ -562,6 +528,83 @@ Output ONLY the following JSON format. Do NOT include any text before or after t
         })
         
         return result
+
+    # --- NEW: MEAL PLAN GENERATION ---
+    def _calculate_tdee(self, user: models.User) -> int:
+        if not all([user.age, user.weight, user.height, user.gender, user.activity_level]):
+            logger.warning(f"User {user.id} missing profile data for TDEE. Using default 2200 kcal.")
+            return 2200
+
+        if user.gender.lower() == 'male':
+            bmr = 88.362 + (13.397 * user.weight) + (4.799 * user.height) - (5.677 * user.age)
+        elif user.gender.lower() == 'female':
+            bmr = 447.593 + (9.247 * user.weight) + (3.098 * user.height) - (4.330 * user.age)
+        else:
+            bmr = (88.362 + 447.593) / 2 + (11.322 * user.weight) + (3.948 * user.height) - (5.003 * user.age)
+
+        activity_multipliers = {'sedentary': 1.2, 'lightly_active': 1.375, 'moderate': 1.55, 'very_active': 1.725, 'extremely_active': 1.9}
+        multiplier = activity_multipliers.get(user.activity_level, 1.55)
+        tdee = bmr * multiplier
+
+        goal_adjustments = {'weight_loss': -500, 'muscle_gain': 300, 'strength': 200, 'endurance': 100, 'general_fitness': 0}
+        adjustment = goal_adjustments.get(user.fitness_goal, 0)
+        
+        final_calories = round(tdee + adjustment)
+        logger.info(f"Calculated TDEE for user {user.id}: {final_calories} kcal")
+        return final_calories
+
+    def create_meal_plan_prompt(self, user: models.User, target_calories: int) -> str:
+        diet_restrictions = ", ".join(user.dietary_restrictions) if user.dietary_restrictions else "none"
+
+        prompt = f"""
+        Generate a one-day meal plan for a user with the following profile:
+        - Fitness Goal: {user.fitness_goal or 'general fitness'}
+        - Dietary Restrictions: {diet_restrictions}
+        - Target Daily Calories: Approximately {target_calories} kcal
+
+        Requirements:
+        - The meal plan must be structured with four meals: Breakfast, Lunch, Dinner, and Snacks.
+        - For EACH meal, provide: a 'name', a list of 'ingredients' with quantities, simple 'instructions', and estimated 'calories', 'protein', 'carbs', and 'fat'.
+        - The total calories for the day must be close to the {target_calories} kcal target.
+        - Calculate and provide total 'target_calories', 'target_protein', 'target_carbs', and 'target_fat' for the day.
+
+        Output ONLY the following JSON format:
+        {{
+            "name": "AI Generated Meal Plan", "target_calories": {target_calories}, "target_protein": 150, "target_carbs": 200, "target_fat": 60,
+            "meals": {{
+                "breakfast": {{"name": "Hearty Oatmeal", "ingredients": ["1 cup oats", "1/2 cup berries"], "instructions": "Mix and cook.", "calories": 400, "protein": 30, "carbs": 50, "fat": 10}},
+                "lunch": {{"name": "Grilled Chicken Salad", "ingredients": ["150g chicken breast", "2 cups greens"], "instructions": "Combine.", "calories": 500, "protein": 40, "carbs": 20, "fat": 25}},
+                "dinner": {{"name": "Salmon with Quinoa", "ingredients": ["150g salmon", "1 cup quinoa"], "instructions": "Bake and serve.", "calories": 600, "protein": 45, "carbs": 50, "fat": 20}},
+                "snacks": {{"name": "Greek Yogurt", "ingredients": ["1 cup yogurt", "1/4 cup nuts"], "instructions": "Combine.", "calories": 300, "protein": 25, "carbs": 15, "fat": 15}}
+            }}
+        }}
+        """
+        return prompt
+
+    async def generate_meal_plan(self, user: models.User, request: schemas.MealPlanRequest) -> Dict:
+        logger.info(f"Starting meal plan generation for user {user.id}")
+        
+        target_calories = self._calculate_tdee(user)
+        prompt = self.create_meal_plan_prompt(user, target_calories)
+        
+        logger.info("Attempting meal plan generation with GroqAI...")
+        try:
+            raw_response = self.groq_ai.generate_text(prompt)
+            if raw_response:
+                meal_plan_data = self.groq_ai.safe_json_extract(raw_response)
+                if meal_plan_data and "meals" in meal_plan_data:
+                    logger.info("🎉 SUCCESS: Groq AI generated meal plan")
+                    meal_plan_data["ai_generated"] = True
+                    meal_plan_data["ai_model"] = f"Groq AI ({self.groq_ai.available_models[self.groq_ai.current_model_index]})"
+                    return meal_plan_data
+                else:
+                    logger.error("❌ Groq (Meal Plan): Invalid JSON structure in response")
+        except Exception as e:
+            logger.error(f"❌ Groq (Meal Plan): Generation failed: {str(e)}")
+
+        logger.warning("⚠️ AI meal plan generation failed. Returning empty plan.")
+        return {"name": "Failed to Generate Plan", "meals": {}, "ai_generated": False, "target_calories": 0, "target_protein": 0, "target_carbs": 0, "target_fat": 0}
+
 
 ai_workout_service = AIWorkoutService()
 ai_workout_generator = ai_workout_service

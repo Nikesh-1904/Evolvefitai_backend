@@ -351,6 +351,27 @@ async def generate_workout_plan(
             detail=f"Workout generation failed: {str(e)}"
         )
 
+@router.post("/meal-plans/generate", response_model=schemas.MealPlan)
+async def generate_meal_plan(
+    request: schemas.MealPlanRequest,
+    current_user: models.User = Depends(current_active_user),
+    session: AsyncSession = Depends(get_async_session)
+):
+    """
+    Generate an AI-powered meal plan based on user profile and preferences.
+    """
+    logger.info(f"🍏 New Meal Plan Generation Request from {current_user.email}")
+    try:
+        meal_plan_data = await ai_workout_generator.generate_meal_plan(current_user, request)
+        if not meal_plan_data.get("ai_generated"):
+            raise HTTPException(status_code=500, detail="AI failed to generate a meal plan.")
+
+        # The response from the service matches the MealPlan schema
+        return meal_plan_data
+
+    except Exception as e:
+        logger.error(f"❌ Meal plan generation failed: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Meal plan generation failed: {str(e)}")
 
 @router.get("/exercises/search")
 async def search_exercises(
