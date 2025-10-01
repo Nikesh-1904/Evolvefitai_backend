@@ -1,6 +1,8 @@
+# app/core/auth.py
+
 import uuid
 from typing import Optional
-from fastapi import Depends, Request
+from fastapi import Depends, Request, Response  # <--- Make sure 'Response' is imported
 from fastapi_users import BaseUserManager, FastAPIUsers, UUIDIDMixin
 from fastapi_users.authentication import AuthenticationBackend, BearerTransport, JWTStrategy
 from fastapi_users.db import SQLAlchemyUserDatabase
@@ -29,19 +31,29 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
     ):
         print(f"Verification requested for user {user.id}. Token: {token}")
 
+    # --- THIS IS THE FIX ---
+    # The signature of on_after_login in fastapi-users v12 includes a `response` parameter.
+    # We simply need to add it to our custom function to match.
     async def on_after_login(
-        self, user: User, request: Optional[Request] = None
+        self,
+        user: User,
+        request: Optional[Request] = None,
+        response: Optional[Response] = None,
     ):
         print(f"User {user.id} logged in.")
+
 
 async def get_user_db(session=Depends(get_async_session)):
     yield SQLAlchemyUserDatabase(session, User, OAuthAccount)
 
+
 async def get_user_manager(user_db=Depends(get_user_db)):
     yield UserManager(user_db)
 
+
 def get_jwt_strategy() -> JWTStrategy:
     return JWTStrategy(secret=SECRET, lifetime_seconds=3600 * 24)  # 24 hours
+
 
 bearer_transport = BearerTransport(tokenUrl="auth/jwt/login")
 
