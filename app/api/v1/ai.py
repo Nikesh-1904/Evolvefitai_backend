@@ -187,7 +187,8 @@ async def search_youtube_videos(query: str, max_results: int = 3) -> List[Dict]:
                     "published": snippet["publishedAt"]
                 })
             
-            logger.success(f"✅ YouTube API: Found {len(videos)} videos for '{query}'")
+            # Using logger.info for successful API calls
+            logger.info(f"✅ YouTube API: Found {len(videos)} videos for '{query}'")
             return videos
         else:
             logger.error(f"❌ YouTube API: Request failed with status {response.status_code}")
@@ -205,13 +206,14 @@ async def generate_workout_plan(
 ):
     """Generate AI-powered workout plan with comprehensive logging"""
     
-    # Log the incoming request
     logger.info("=" * 100)
     logger.info("🚀 NEW WORKOUT GENERATION REQUEST")
     logger.info(f"👤 User ID: {current_user.id}")
     logger.info(f"📧 User Email: {current_user.email}")
     logger.info(f"🕐 Request Time: {datetime.now().isoformat()}")
     logger.info(f"⏱️ Duration: {request.duration_minutes} minutes")
+    if request.target_muscle_groups:
+        logger.info(f"💪 Targeting: {', '.join(request.target_muscle_groups)}")
     logger.info(f"👤 User Profile Summary:")
     logger.info(f"   - Age: {getattr(current_user, 'age', 'Not set')}")
     logger.info(f"   - Weight: {getattr(current_user, 'weight', 'Not set')}kg")
@@ -226,15 +228,15 @@ async def generate_workout_plan(
     try:
         logger.info("🧠 Starting AI workout generation process...")
         
-        # Generate workout using AI
+        # --- FIX: Correctly pass all necessary arguments to the generator ---
         workout_data = await ai_workout_generator.generate_workout(
-            current_user,
-            request.duration_minutes
+            user=current_user,
+            duration_minutes=request.duration_minutes,
+            target_muscles=request.target_muscle_groups
         )
         
         generation_time = (datetime.now() - start_time).total_seconds()
         
-        # Log generation results
         logger.info("📊 GENERATION RESULTS:")
         logger.info(f"   ✅ Success: True")
         logger.info(f"   ⏱️ Total Time: {generation_time:.2f} seconds")
@@ -245,14 +247,12 @@ async def generate_workout_plan(
         logger.info(f"   🔥 Estimated Calories: {workout_data.get('estimated_calories', 'Not calculated')}")
         logger.info(f"   📈 Difficulty: {workout_data.get('difficulty_level', 'Not specified')}")
         
-        # Log exercises summary
         exercises = workout_data.get('exercises', [])
         if exercises:
             logger.info("🏋️ GENERATED EXERCISES:")
             for i, exercise in enumerate(exercises, 1):
                 logger.info(f"   {i}. {exercise.get('name', 'Unknown')} - {exercise.get('sets', '?')} sets x {exercise.get('reps', '?')} reps")
 
-        # Create workout plan in database
         logger.info("💾 Saving workout to database...")
         
         workout_plan = models.WorkoutPlan(
@@ -260,7 +260,7 @@ async def generate_workout_plan(
             name=workout_data["name"],
             description=workout_data.get("description", "AI-generated workout plan"),
             exercises=workout_data["exercises"],
-            difficulty=workout_data.get("difficulty_level", "moderate"),
+            difficulty=workout_data.get("difficulty_level", getattr(current_user, 'experience_level', 'intermediate')),
             estimated_duration=workout_data.get("estimated_duration", request.duration_minutes),
             ai_generated=workout_data.get("ai_generated", False),
             ai_model=workout_data.get("ai_model", "Unknown"),
@@ -276,10 +276,10 @@ async def generate_workout_plan(
         logger.info(f"💾 Database save completed in {db_save_time - generation_time:.2f}s")
         logger.info(f"🆔 Saved with ID: {workout_plan.id}")
         
-        # Final success log
         total_time = (datetime.now() - start_time).total_seconds()
         logger.info("=" * 100)
-        logger.success("✅ WORKOUT GENERATION COMPLETED SUCCESSFULLY!")
+        # Using logger.info for successful completion message
+        logger.info("✅ WORKOUT GENERATION COMPLETED SUCCESSFULLY!")
         logger.info(f"🕐 Total Processing Time: {total_time:.2f} seconds")
         logger.info(f"📈 Performance Breakdown:")
         logger.info(f"   - AI Generation: {generation_time:.2f}s ({(generation_time/total_time)*100:.1f}%)")
@@ -292,7 +292,6 @@ async def generate_workout_plan(
     except Exception as e:
         error_time = (datetime.now() - start_time).total_seconds()
         
-        # Log the error with full context
         logger.error("=" * 100)
         logger.error("❌ WORKOUT GENERATION FAILED!")
         logger.error(f"👤 User: {current_user.email} (ID: {current_user.id})")
@@ -331,7 +330,6 @@ async def search_exercises(
             
             exercise_data = []
             for exercise in exercises:
-                # Get videos and tips from database
                 videos_result = await session.execute(
                     select(models.ExerciseVideo).where(models.ExerciseVideo.exercise_id == exercise.id).limit(3)
                 )
@@ -350,17 +348,14 @@ async def search_exercises(
             
             return exercise_data
         
-        # ENHANCED: Check our exercise database
         exercise_name_lower = name.lower().strip()
         
         for key, exercise_info in EXERCISE_DATABASE.items():
             if key in exercise_name_lower or exercise_name_lower in key:
                 logger.info(f"✅ Found '{name}' in exercise database")
                 
-                # Get YouTube videos for this exercise
                 youtube_videos = await search_youtube_videos(exercise_info["name"])
                 
-                # Combine database videos with YouTube results
                 all_videos = exercise_info["videos"] + youtube_videos
                 
                 exercise_data = {
@@ -371,14 +366,13 @@ async def search_exercises(
                         "equipment": exercise_info["equipment"],
                         "difficulty": exercise_info["difficulty"]
                     },
-                    "videos": all_videos[:5],  # Max 5 videos
+                    "videos": all_videos[:5],
                     "tips": exercise_info["tips"]
                 }
                 
-                logger.success(f"📚 Returned exercise data for '{name}' with {len(all_videos)} videos and {len(exercise_info['tips'])} tips")
+                logger.info(f"📚 Returned exercise data for '{name}' with {len(all_videos)} videos and {len(exercise_info['tips'])} tips")
                 return exercise_data
         
-        # FALLBACK: Search YouTube and create basic exercise info
         logger.info(f"🔄 No database match for '{name}', searching YouTube...")
         youtube_videos = await search_youtube_videos(name)
         
@@ -404,10 +398,9 @@ async def search_exercises(
                 ]
             }
             
-            logger.success(f"📺 Found YouTube videos for '{name}': {len(youtube_videos)} videos")
+            logger.info(f"📺 Found YouTube videos for '{name}': {len(youtube_videos)} videos")
             return exercise_data
         
-        # NO RESULTS
         logger.warning(f"⚠️ No exercises or videos found for '{name}'")
         return {
             "message": f"No detailed information found for '{name}'",
@@ -431,8 +424,7 @@ async def interact_with_tip(
     logger.info(f"👍 Tip interaction from {current_user.email}: {interaction.interaction_type} on tip {interaction.tip_id}")
     
     try:
-        # Store feedback for AI improvement
-        logger.success(f"✅ Tip interaction '{interaction.interaction_type}' recorded for improvement")
+        logger.info(f"✅ Tip interaction '{interaction.interaction_type}' recorded for improvement")
         return {
             "message": "Feedback recorded! This helps improve AI recommendations.",
             "tip_id": interaction.tip_id,
@@ -455,7 +447,6 @@ async def analyze_plateau(
     logger.info(f"📊 Plateau analysis requested by {current_user.email}")
     
     try:
-        # Basic plateau analysis logic
         analysis = {
             "is_plateau": False,
             "confidence": 0.75,
@@ -471,25 +462,14 @@ async def analyze_plateau(
             "ai_generated": False
         }
         
-        logger.success(f"✅ Plateau analysis completed for {current_user.email}")
+        logger.info(f"✅ Plateau analysis completed for {current_user.email}")
         return analysis
         
     except Exception as e:
         logger.error(f"❌ Plateau analysis failed: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Plateau analysis failed: {str(e)}")
 
-
-# Set up module-specific logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S'
-)
-
-# Add custom success level for this module too
-def success(self, message, *args, **kwargs):
-    if self.isEnabledFor(25):
-        self._log(25, message, args, **kwargs)
-
-logging.Logger.success = success
-logging.addLevelName(25, "SUCCESS")
+# Remove custom logging setup to avoid conflicts with FastAPI's default logger
+# logging.basicConfig(...)
+# logging.Logger.success = success
+# logging.addLevelName(...)
