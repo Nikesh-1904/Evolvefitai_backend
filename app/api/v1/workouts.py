@@ -1,7 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException
+# app/api/v1/workouts.py
+
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
+from datetime import datetime
 
 from app.core.database import get_async_session
 from app.core.auth import current_active_user
@@ -29,26 +32,44 @@ async def create_workout_plan(
     current_user: models.User = Depends(current_active_user),
     session: AsyncSession = Depends(get_async_session)
 ):
-    """Create a new workout plan"""
+    """Create a new workout plan (manual user creation)"""
+    # Convert exercises to JSON-compatible dicts before saving
+    exercises_as_dicts = [ex for ex in workout_plan.exercises]
+
     db_plan = models.WorkoutPlan(
         user_id=current_user.id,
-        **workout_plan.dict()
+        name=workout_plan.name,
+        description=workout_plan.description,
+        exercises=exercises_as_dicts, # Ensure exercises are stored as dicts
+        difficulty=workout_plan.difficulty,
+        estimated_duration=workout_plan.estimated_duration,
+        ai_generated=False # Manually created plans are not AI generated
     )
     session.add(db_plan)
     await session.commit()
     await session.refresh(db_plan)
     return db_plan
 
+# --- UPDATED ENDPOINT ---
 @router.post("/logs", response_model=schemas.WorkoutLog)
 async def log_workout(
     workout_log: schemas.WorkoutLogCreate,
     current_user: models.User = Depends(current_active_user),
     session: AsyncSession = Depends(get_async_session)
 ):
-    """Log a completed workout"""
+    """Log a completed workout with detailed set information."""
+    
+    # Pydantic automatically converts the incoming JSON to our schema objects.
+    # To save to a JSON column, we need to convert them back to dicts.
+    exercises_completed_as_dicts = [ex.dict() for ex in workout_log.exercises_completed]
+    
     db_log = models.WorkoutLog(
         user_id=current_user.id,
-        **workout_log.dict()
+        workout_plan_id=workout_log.workout_plan_id,
+        exercises_completed=exercises_completed_as_dicts,
+        duration_minutes=workout_log.duration_minutes,
+        notes=workout_log.notes,
+        workout_date=workout_log.workout_date or datetime.utcnow()
     )
     session.add(db_log)
     await session.commit()

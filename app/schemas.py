@@ -6,7 +6,16 @@ from datetime import datetime
 import uuid
 from fastapi_users import schemas
 
-# User schemas are now correctly inheriting from BaseModel
+# --- NEW Schemas for Workout Logging ---
+class LoggedSet(BaseModel):
+    reps: int
+    weight: float
+
+class LoggedExercise(BaseModel):
+    name: str
+    sets: List[LoggedSet]
+
+# User schemas
 class UserRead(schemas.BaseUser[uuid.UUID]):
     id: uuid.UUID
     email: EmailStr
@@ -102,13 +111,16 @@ class WorkoutPlan(WorkoutPlanBase):
     class Config:
         from_attributes = True
 
+# --- UPDATED Workout Log Schemas ---
 class WorkoutLogBase(BaseModel):
-    exercises_completed: List[Dict[str, Any]] = []
     duration_minutes: Optional[int] = None
     notes: Optional[str] = None
+    # We now expect a list of Pydantic models, not just dicts
+    exercises_completed: List[LoggedExercise] = []
 
 class WorkoutLogCreate(WorkoutLogBase):
     workout_plan_id: Optional[int] = None
+    workout_date: Optional[datetime] = None
 
 class WorkoutLog(WorkoutLogBase):
     id: int
@@ -159,17 +171,16 @@ class ExerciseTip(ExerciseTipBase):
 # Interaction schemas
 class TipInteractionCreate(BaseModel):
     tip_id: int
-    interaction_type: str  # like, dislike
+    interaction_type: str
 
 class VideoPreferenceCreate(BaseModel):
     video_id: int
-    preference: str  # like, dislike
+    preference: str
 
 # AI Request/Response schemas
 class WorkoutGenerationRequest(BaseModel):
     user_preferences: Optional[Dict[str, Any]] = {}
     duration_minutes: Optional[int] = 45
-    # --- NEW FIELD ---
     target_muscle_groups: Optional[List[str]] = None
 
 class PlateauAnalysis(BaseModel):
