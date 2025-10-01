@@ -25,9 +25,9 @@ class GroqAI:
             "Content-Type": "application/json",
         }
         self.available_models = [
-            "llama3-8b-8192",
-            "gemma-7b-it",
-            "mixtral-8x7b-32768",
+            "llama-3.3-70b-versatile", # High-power replacement
+            "llama-3.1-8b-instant",     # Fast and reliable
+            "openai/gpt-oss-120b"
         ]
         self.current_model_index = 0
 
@@ -171,10 +171,9 @@ class HuggingFaceAI:
         }
         
         self.available_models = [
-            "mistralai/Mistral-7B-Instruct-v0.2",
-            "google/gemma-7b-it",
+            "meta-llama/Meta-Llama-3-8B-Instruct",
+            "google/gemma-2-9b-it",
             "HuggingFaceH4/zephyr-7b-beta",
-            "openchat/openchat-3.5-0106",
         ]
         self.current_model_index = 0
     
