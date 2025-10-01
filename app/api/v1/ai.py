@@ -1,9 +1,9 @@
-# app/api/v1/ai.py - Enhanced with better exercise search and YouTube integration
+# app/api/v1/ai.py
 
 import logging
 import requests
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional , Dict
 from datetime import datetime
@@ -182,12 +182,11 @@ async def search_youtube_videos(query: str, max_results: int = 3) -> List[Dict]:
                     "title": snippet["title"],
                     "youtube_url": f"https://www.youtube.com/watch?v={video_id}",
                     "thumbnail_url": snippet["thumbnails"]["high"]["url"],
-                    "duration": 180,  # Default duration
+                    "duration": 180,
                     "channel": snippet["channelTitle"],
                     "published": snippet["publishedAt"]
                 })
             
-            # Using logger.info for successful API calls
             logger.info(f"✅ YouTube API: Found {len(videos)} videos for '{query}'")
             return videos
         else:
@@ -204,7 +203,7 @@ async def generate_workout_plan(
     current_user: models.User = Depends(current_active_user),
     session: AsyncSession = Depends(get_async_session)
 ):
-    """Generate AI-powered workout plan with comprehensive logging"""
+    """Generate AI-powered workout plan with comprehensive logging and self-populating exercise DB"""
     
     logger.info("=" * 100)
     logger.info("🚀 NEW WORKOUT GENERATION REQUEST")
@@ -228,7 +227,6 @@ async def generate_workout_plan(
     try:
         logger.info("🧠 Starting AI workout generation process...")
         
-        # --- FIX: Correctly pass all necessary arguments to the generator ---
         workout_data = await ai_workout_generator.generate_workout(
             user=current_user,
             duration_minutes=request.duration_minutes,
@@ -247,12 +245,62 @@ async def generate_workout_plan(
         logger.info(f"   🔥 Estimated Calories: {workout_data.get('estimated_calories', 'Not calculated')}")
         logger.info(f"   📈 Difficulty: {workout_data.get('difficulty_level', 'Not specified')}")
         
-        exercises = workout_data.get('exercises', [])
-        if exercises:
-            logger.info("🏋️ GENERATED EXERCISES:")
-            for i, exercise in enumerate(exercises, 1):
-                logger.info(f"   {i}. {exercise.get('name', 'Unknown')} - {exercise.get('sets', '?')} sets x {exercise.get('reps', '?')} reps")
+        # --- NEW: Self-populating Exercise Database Logic ---
+        if workout_data.get("ai_generated") and workout_data.get("exercises"):
+            for exercise_from_ai in workout_data["exercises"]:
+                exercise_name = exercise_from_ai.get("name")
+                if not exercise_name:
+                    continue
 
+                # Check if exercise exists (case-insensitive)
+                result = await session.execute(
+                    select(models.Exercise).where(func.lower(models.Exercise.name) == exercise_name.lower())
+                )
+                existing_exercise = result.scalars().first()
+
+                if not existing_exercise:
+                    logger.info(f"✨ New exercise found: '{exercise_name}'. Adding to database.")
+                    
+                    # 1. Create the new Exercise
+                    new_exercise = models.Exercise(
+                        name=exercise_name,
+                        instructions=exercise_from_ai.get("instructions"),
+                        muscle_groups=exercise_from_ai.get("muscle_groups", []),
+                        difficulty=workout_data.get("difficulty_level")
+                    )
+                    session.add(new_exercise)
+                    await session.flush()  # Flush to get the new_exercise.id
+
+                    # 2. Search for YouTube videos
+                    videos = await search_youtube_videos(exercise_name)
+                    for video_data in videos:
+                        new_video = models.ExerciseVideo(
+                            exercise_id=new_exercise.id,
+                            youtube_url=video_data["youtube_url"],
+                            title=video_data["title"],
+                            thumbnail_url=video_data.get("thumbnail_url"),
+                            duration=video_data.get("duration")
+                        )
+                        session.add(new_video)
+
+                    # 3. Add default tips
+                    default_tips = [
+                        {"title": "Focus on Form", "content": "Always prioritize proper form over heavy weight to prevent injury.", "tip_type": "Form"},
+                        {"title": "Control Your Breathing", "content": "Exhale on exertion (the hard part) and inhale during the easier phase of the movement.", "tip_type": "Technique"}
+                    ]
+                    for tip_data in default_tips:
+                        new_tip = models.ExerciseTip(
+                            exercise_id=new_exercise.id,
+                            title=tip_data["title"],
+                            content=tip_data["content"],
+                            tip_type=tip_data["tip_type"]
+                        )
+                        session.add(new_tip)
+            
+            # Commit all new exercises, videos, and tips at once
+            await session.commit()
+        # --- END of new logic ---
+        
         logger.info("💾 Saving workout to database...")
         
         workout_plan = models.WorkoutPlan(
@@ -278,12 +326,8 @@ async def generate_workout_plan(
         
         total_time = (datetime.now() - start_time).total_seconds()
         logger.info("=" * 100)
-        # Using logger.info for successful completion message
         logger.info("✅ WORKOUT GENERATION COMPLETED SUCCESSFULLY!")
         logger.info(f"🕐 Total Processing Time: {total_time:.2f} seconds")
-        logger.info(f"📈 Performance Breakdown:")
-        logger.info(f"   - AI Generation: {generation_time:.2f}s ({(generation_time/total_time)*100:.1f}%)")
-        logger.info(f"   - Database Save: {db_save_time - generation_time:.2f}s ({((db_save_time - generation_time)/total_time)*100:.1f}%)")
         logger.info(f"🎯 Final Result: {workout_plan.ai_model} generated '{workout_plan.name}'")
         logger.info("=" * 100)
 
@@ -319,7 +363,6 @@ async def search_exercises(
     logger.info(f"🔍 Exercise search requested by {current_user.email}: '{name}'")
     
     try:
-        # First check database
         result = await session.execute(
             select(models.Exercise).where(models.Exercise.name.ilike(f"%{name}%")).limit(5)
         )
@@ -468,8 +511,3 @@ async def analyze_plateau(
     except Exception as e:
         logger.error(f"❌ Plateau analysis failed: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Plateau analysis failed: {str(e)}")
-
-# Remove custom logging setup to avoid conflicts with FastAPI's default logger
-# logging.basicConfig(...)
-# logging.Logger.success = success
-# logging.addLevelName(...)
