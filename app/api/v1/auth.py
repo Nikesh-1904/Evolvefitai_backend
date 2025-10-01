@@ -1,61 +1,77 @@
-# app/api/v1/auth.py
+# app/core/auth.py
 
-from fastapi import APIRouter
-from app.core.auth import auth_backend, fastapi_users, google_oauth_client
+import uuid
+from typing import Optional
+from fastapi import Depends, Request, Response  # <--- Make sure 'Response' is imported
+from fastapi_users import BaseUserManager, FastAPIUsers, UUIDIDMixin
+from fastapi_users.authentication import AuthenticationBackend, BearerTransport, JWTStrategy
+from fastapi_users.db import SQLAlchemyUserDatabase
+from httpx_oauth.clients.google import GoogleOAuth2
+
 from app.core.config import settings
-from app.schemas import UserRead, UserCreate, UserUpdate
+from app.core.database import get_async_session
+from app.models import User, OAuthAccount
 
-router = APIRouter()
+SECRET = settings.SECRET_KEY
 
-# --- JWT Login and Logout ---
-# This provides the POST /api/v1/auth/jwt/login endpoint that the frontend needs.
-router.include_router(
-    fastapi_users.get_auth_router(auth_backend),
-    prefix="/jwt",
-    tags=["authentication"],
+class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
+    reset_password_token_secret = SECRET
+    verification_token_secret = SECRET
+
+    async def on_after_register(self, user: User, request: Optional[Request] = None):
+        print(f"User {user.id} has registered.")
+
+    async def on_after_forgot_password(
+        self, user: User, token: str, request: Optional[Request] = None
+    ):
+        print(f"User {user.id} has requested a password reset. Token: {token}")
+
+    async def on_after_request_verify(
+        self, user: User, token: str, request: Optional[Request] = None
+    ):
+        print(f"Verification requested for user {user.id}. Token: {token}")
+
+    # --- THIS IS THE FIX ---
+    # The signature of on_after_login in fastapi-users v12 includes a `response` parameter.
+    # We simply need to add it to our custom function to match.
+    async def on_after_login(
+        self,
+        user: User,
+        request: Optional[Request] = None,
+        response: Optional[Response] = None,
+    ):
+        print(f"User {user.id} logged in.")
+
+
+async def get_user_db(session=Depends(get_async_session)):
+    yield SQLAlchemyUserDatabase(session, User, OAuthAccount)
+
+
+async def get_user_manager(user_db=Depends(get_user_db)):
+    yield UserManager(user_db)
+
+
+def get_jwt_strategy() -> JWTStrategy:
+    return JWTStrategy(secret=SECRET, lifetime_seconds=3600 * 24)  # 24 hours
+
+
+bearer_transport = BearerTransport(tokenUrl="auth/jwt/login")
+
+auth_backend = AuthenticationBackend(
+    name="jwt",
+    transport=bearer_transport,
+    get_strategy=get_jwt_strategy,
 )
 
-# --- Registration ---
-# This provides the POST /api/v1/auth/register endpoint that was returning a 404 error.
-router.include_router(
-    fastapi_users.get_register_router(UserRead, UserCreate),
-    tags=["authentication"],
-)
-
-# --- Password Reset ---
-# Provides POST /auth/forgot-password and POST /auth/reset-password
-router.include_router(
-    fastapi_users.get_reset_password_router(),
-    tags=["authentication"],
-)
-
-# --- Email Verification ---
-# Provides POST /auth/request-verify-token and POST /auth/verify
-router.include_router(
-    fastapi_users.get_verify_router(UserRead),
-    tags=["authentication"],
-)
-
-# --- User Management ---
-# Provides the GET /users/me and PATCH /users/me endpoints that the Profile page uses.
-router.include_router(
-    fastapi_users.get_users_router(UserRead, UserUpdate),
-    prefix="/users",
-    tags=["users"],
-)
-
-# --- Google OAuth ---
-# Includes the authorize and callback endpoints for Google login.
-# This uses the standard library implementation which should work seamlessly.
-if google_oauth_client:
-    router.include_router(
-        fastapi_users.get_oauth_router(
-            oauth_client=google_oauth_client,
-            backend=auth_backend,
-            state_secret=settings.SECRET_KEY,
-            # The user is redirected here from Google, and the backend handles the rest.
-            redirect_url=f"{settings.FRONTEND_URL}/auth/callback",
-        ),
-        prefix="/google",
-        tags=["authentication"],
+if settings.GOOGLE_CLIENT_ID and settings.GOOGLE_CLIENT_SECRET:
+    google_oauth_client = GoogleOAuth2(
+        client_id=settings.GOOGLE_CLIENT_ID,
+        client_secret=settings.GOOGLE_CLIENT_SECRET,
     )
+else:
+    google_oauth_client = None
+
+fastapi_users = FastAPIUsers[User, uuid.UUID](get_user_manager, [auth_backend])
+
+current_active_user = fastapi_users.current_user(active=True)
+current_user = fastapi_users.current_user()
