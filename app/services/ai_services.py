@@ -172,9 +172,9 @@ class HuggingFaceAI:
         }
         
         self.available_models = [
-            "meta-llama/Meta-Llama-3-8B-Instruct",
-            "google/gemma-2-9b-it",
-            "HuggingFaceH4/zephyr-7b-beta",
+            "mistralai/Mistral-7B-Instruct-v0.3",  # Primary: Best all-rounder
+            "HuggingFaceH4/zephyr-7b-beta",        # Secondary: More creative
+            "google/gemma-2b-it"
         ]
         self.current_model_index = 0
     
