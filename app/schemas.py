@@ -1,6 +1,6 @@
 # app/schemas.py
 
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, validator
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 import uuid
@@ -53,6 +53,12 @@ class UserUpdate(schemas.BaseUserUpdate):
     experience_level: Optional[str] = None
     activity_level: Optional[str] = None
     dietary_restrictions: Optional[List[str]] = []
+
+    @validator("username")
+    def username_must_not_be_empty(cls, v):
+        if v is not None and v == "":
+            raise ValueError("Username cannot be an empty string")
+        return v
 
 # Exercise schemas
 class ExerciseBase(BaseModel):
