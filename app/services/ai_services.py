@@ -593,7 +593,7 @@ class AIWorkoutService:
         self.rule_based = RuleBasedWorkoutGenerator()
         self.rule_based_meals = RuleBasedMealPlanGenerator()  # NEW
 
-    def create_ai_prompt(self, goal: str, level: str, duration: int, preferences: Dict = None, target_muscles: Optional[List[str]] = None) -> str:
+def create_ai_prompt(self, goal: str, level: str, duration: int, preferences: Dict = None, target_muscles: Optional[List[str]] = None) -> str:
         prompt = f"Generate a {duration}-minute workout. The user's primary goal is {goal} and their fitness level is {level}."
 
         if target_muscles:
@@ -602,30 +602,31 @@ class AIWorkoutService:
 
         prompt += """
 
-Requirements:
-- Provide a creative and motivating name for the workout.
-- The number of exercises should be appropriate for the duration and fitness level.
-- Provide a brief description of the overall workout.
-- For EACH exercise, provide the following details: name, sets, reps, instructions, and a list of primary muscle_groups targeted.
+            Requirements:
+            - Provide a creative and motivating name for the workout.
+            - The number of exercises should be appropriate for the duration and fitness level.
+            - Provide a brief description of the overall workout.
+            - For EACH exercise, provide the following details: name, sets, reps, instructions, a list of primary muscle_groups targeted, and an estimated met_value (Metabolic Equivalent of Task).
 
-Output ONLY the following JSON format. Do NOT include any text before or after the JSON object:
+            Output ONLY the following JSON format. Do NOT include any text before or after the JSON object:
 
-{
-  "name": "Workout Name",
-  "description": "A brief overview of the workout.",
-  "difficulty_level": "{level}",
-  "estimated_duration": {duration},
-  "estimated_calories": 250,
-  "exercises": [
-    {
-      "name": "Exercise Name",
-      "sets": 3,
-      "reps": "8-12",
-      "instructions": "Detailed instructions on how to perform this exercise.",
-      "muscle_groups": ["chest", "triceps"]
-    }
-  ]
-}"""
+            {
+            "name": "Workout Name",
+            "description": "A brief overview of the workout.",
+            "difficulty_level": "{level}",
+            "estimated_duration": {duration},
+            "estimated_calories": 250,
+            "exercises": [
+                {
+                "name": "Exercise Name",
+                "sets": 3,
+                "reps": "8-12",
+                "instructions": "Detailed instructions on how to perform this exercise.",
+                "muscle_groups": ["chest", "triceps"],
+                "met_value": 6.0
+                }
+            ]
+            }"""
 
         if preferences:
             prompt += f"\nPreferences: {preferences}"
@@ -869,6 +870,34 @@ Output ONLY the following JSON format:
         meal_plan_data = self.rule_based_meals.generate_meal_plan(user, target_calories)
         logger.info("✅ SUCCESS: Rule-based system generated meal plan")
         return meal_plan_data
+
+     async def get_met_value_for_exercise(self, exercise_name: str) -> float:
+        """Gets a MET value for a single exercise name using AI, with a fallback."""
+        logger.info(f"🔎 Getting MET value for exercise: '{exercise_name}'")
+        
+        prompt = f'''What is the MET (Metabolic Equivalent of Task) value for the exercise "{exercise_name}"?
+        
+        Respond ONLY with a JSON object in the format {{"met_value": 5.5}}. 
+        If you don't know the MET value, respond with {{"met_value": null}}.
+        '''
+        
+        # Use a fast AI provider for this quick lookup
+        raw_response = self.groq_ai.generate_text(prompt, max_tokens=50)
+        
+        if raw_response:
+            try:
+                data = self.groq_ai.safe_json_extract(raw_response)
+                if data and "met_value" in data and data["met_value"] is not None:
+                    met_value = float(data["met_value"])
+                    logger.info(f"✅ AI found MET value for '{exercise_name}': {met_value}")
+                    return met_value
+            except (ValueError, TypeError) as e:
+                logger.warning(f"⚠️ Could not parse MET value from AI response: {e}")
+
+        # If AI fails or returns null, use our default value
+        logger.warning(f"⚠️ Using default MET value for '{exercise_name}'")
+        return 3.5  # Our agreed-upon default
+
 
 # Initialize services
 ai_workout_service = AIWorkoutService()
