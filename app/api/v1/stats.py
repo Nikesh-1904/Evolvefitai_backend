@@ -11,6 +11,8 @@ from app import models, schemas
 
 router = APIRouter()
 
+# In Evolvefitai_backend/app/api/v1/stats.py
+
 @router.get("/dashboard", response_model=schemas.DashboardStats)
 async def get_dashboard_stats(
     current_user: models.User = Depends(current_active_user),
@@ -18,7 +20,6 @@ async def get_dashboard_stats(
 ):
     """Get calculated dashboard statistics for the current user."""
     
-    # Create a query to get all stats in one database call
     query = (
         select(
             func.count(models.WorkoutLog.id).label("workouts_completed"),
@@ -31,19 +32,23 @@ async def get_dashboard_stats(
     result = await session.execute(query)
     stats = result.first()
 
-    # Handle the case where a user has no logs yet
     workouts_completed = stats.workouts_completed or 0
     total_duration_minutes = stats.total_duration_minutes or 0
     total_calories_burned = stats.total_calories_burned or 0
 
-    # Calculate Fitness Level based on our 5x multiplier rule
+    # --- START: CORRECTED LEVEL CALCULATION ---
+    
     points = total_calories_burned / 2
     level = 1
-    threshold = 100
-    if points >= threshold:
-        # A logarithmic approach is efficient for calculating levels with multipliers
-        # Level = 1 + floor(log(points / 100) / log(5))
-        level = 1 + math.floor(math.log(points / 100, 5))
+    threshold = 100  # Points needed to reach Level 2
+
+    # This loop correctly finds the user's level based on the 5x multiplier
+    while points >= threshold:
+        level += 1
+        # The next threshold is 5 times the current one
+        threshold *= 5
+
+    # --- END: CORRECTED LEVEL CALCULATION ---
 
     return schemas.DashboardStats(
         workouts_completed=workouts_completed,
