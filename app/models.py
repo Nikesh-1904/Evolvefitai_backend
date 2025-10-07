@@ -64,6 +64,7 @@ class Exercise(Base):
     equipment = Column(String)
     difficulty = Column(String)
     instructions = Column(Text)
+    met_value = Column(Float, nullable=True) # 👈 ADD THIS LINE
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
     videos = relationship("ExerciseVideo", back_populates="exercise")
@@ -109,6 +110,7 @@ class WorkoutLog(Base):
     workout_plan_id = Column(Integer, ForeignKey("workout_plans.id"), nullable=True)
     exercises_completed = Column(JSON, default=list)
     duration_minutes = Column(Integer)
+    calories_burned = Column(Float, nullable=True) # 👈 ADD THIS LINE
     notes = Column(Text)
     workout_date = Column(DateTime(timezone=True), server_default=func.now())
     
