@@ -208,6 +208,10 @@ class MealPlanRequest(BaseModel):
     duration_days: int = 7
     preferences: Optional[Dict[str, Any]] = {}
 
+class METValueResponse(BaseModel):
+    exercise_name: str
+    met_value: float
+    
 # Response schemas
 class MessageResponse(BaseModel):
     message: str

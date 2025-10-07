@@ -80,33 +80,53 @@ async def log_workout(
     current_user: models.User = Depends(current_active_user),
     session: AsyncSession = Depends(get_async_session)
 ):
-    """Log a completed workout and calculate calories burned."""
+    """Log a completed workout and calculate calories burned using per-exercise MET values."""
     
-    # Note: Using .model_dump() is the standard for Pydantic v2+
     exercises_completed_as_dicts = [ex.model_dump() for ex in workout_log.exercises_completed]
     
-    # --- START: CALORIE CALCULATION LOGIC ---
+    # --- START: ADVANCED CALORIE CALCULATION ---
 
-    # 1. Get user's weight from their profile, with a default of 70kg as a fallback.
+    met_values = []
+    DEFAULT_MET_VALUE = 3.5
+
+    # 1. Loop through each exercise the user logged.
+    for exercise_log in workout_log.exercises_completed:
+        exercise_name = exercise_log.name
+        
+        # 2. Try to find the exercise and its MET value in our database first.
+        result = await session.execute(
+            select(models.Exercise).where(models.Exercise.name.ilike(exercise_name))
+        )
+        exercise_db = result.scalars().first()
+        
+        if exercise_db and exercise_db.met_value:
+            met_values.append(exercise_db.met_value)
+        else:
+            # 3. If not in DB, call the AI to get the MET value.
+            ai_met_value = await ai_workout_generator.get_met_value_for_exercise(exercise_name)
+            met_values.append(ai_met_value)
+            
+            # 4. (Self-populating) If the exercise exists, update it with the new MET value.
+            if exercise_db:
+                exercise_db.met_value = ai_met_value
+                session.add(exercise_db)
+
+    # 5. Calculate the average MET value for the session.
+    average_met = sum(met_values) / len(met_values) if met_values else DEFAULT_MET_VALUE
+
+    # 6. Use the average MET in our calorie formula.
     user_weight_kg = current_user.weight if current_user.weight else 70.0
-
-    # 2. Get the workout duration in hours.
     duration_hours = (workout_log.duration_minutes or 0) / 60.0
+    calories_burned = round(duration_hours * average_met * user_weight_kg)
 
-    # 3. Use our agreed-upon default MET value for general strength training.
-    MET_VALUE = 3.5
-
-    # 4. Calculate the calories burned using the standard formula.
-    calories_burned = round(duration_hours * MET_VALUE * user_weight_kg)
-
-    # --- END: CALORIE CALCULATION LOGIC ---
+    # --- END: ADVANCED CALORIE CALCULATION ---
     
     db_log = models.WorkoutLog(
         user_id=current_user.id,
         workout_plan_id=workout_log.workout_plan_id,
         exercises_completed=exercises_completed_as_dicts,
         duration_minutes=workout_log.duration_minutes,
-        calories_burned=calories_burned,  # 👈 Save the calculated value
+        calories_burned=calories_burned,
         notes=workout_log.notes,
         workout_date=workout_log.workout_date or datetime.utcnow()
     )

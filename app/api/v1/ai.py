@@ -219,6 +219,18 @@ async def search_youtube_videos(query: str, max_results: int = 3) -> List[Dict]:
         logger.error(f"YouTube API: Error searching videos: {str(e)}")
         return []
 
+@router.get("/met-value", response_model=schemas.METValueResponse)
+async def get_met_value(
+    exercise_name: str,
+    current_user: models.User = Depends(current_active_user)
+):
+    """Get the MET value for a single exercise by its name using the AI service."""
+    met_value = await ai_workout_generator.get_met_value_for_exercise(exercise_name)
+    return schemas.METValueResponse(
+        exercise_name=exercise_name,
+        met_value=met_value
+    )
+
 @router.post("/workouts/generate", response_model=schemas.WorkoutPlan)
 async def generate_workout_plan(
     request: schemas.WorkoutGenerationRequest,
