@@ -9,6 +9,7 @@ from datetime import datetime
 from app.core.database import get_async_session
 from app.core.auth import current_active_user
 from app import models, schemas
+from app.services.ai_services import ai_workout_generator
 
 router = APIRouter()
 
