@@ -165,6 +165,12 @@ class ExerciseTipBase(BaseModel):
     content: str
     tip_type: Optional[str] = None
 
+class DashboardStats(BaseModel):
+    workouts_completed: int
+    total_workout_time_hours: float
+    total_calories_burned: int
+    fitness_level: str
+
 class ExerciseTip(ExerciseTipBase):
     id: int
     exercise_id: int
