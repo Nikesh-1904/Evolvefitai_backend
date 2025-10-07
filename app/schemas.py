@@ -2,7 +2,7 @@
 
 from pydantic import BaseModel, EmailStr, validator
 from typing import Optional, List, Dict, Any
-from datetime import datetime
+from datetime import datetime,date
 import uuid
 from fastapi_users import schemas
 
@@ -165,11 +165,26 @@ class ExerciseTipBase(BaseModel):
     content: str
     tip_type: Optional[str] = None
 
-class DashboardStats(BaseModel):
+class LevelProgress(BaseModel):
+    current_level: int
+    current_points: int
+    points_for_current_level: int
+    points_for_next_level: int
+
+class DashboardOverviewStats(BaseModel):
     workouts_completed: int
     total_workout_time_hours: float
     total_calories_burned: int
-    fitness_level: str
+    level_progress: LevelProgress
+
+class TimeSeriesDataPoint(BaseModel):
+    date: date
+    value: float
+
+class AnalyticsData(BaseModel):
+    calorie_timeseries: List[TimeSeriesDataPoint]
+    workout_heatmap: List[date]
+
 
 class ExerciseTip(ExerciseTipBase):
     id: int

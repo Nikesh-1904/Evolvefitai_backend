@@ -1,9 +1,11 @@
 # app/api/v1/stats.py
 
 import math
-from fastapi import APIRouter, Depends, HTTPException
+from datetime import date, timedelta
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select, func, and_
 from sqlalchemy.ext.asyncio import AsyncSession
+from typing import List
 
 from app.core.database import get_async_session
 from app.core.auth import current_active_user
@@ -11,14 +13,12 @@ from app import models, schemas
 
 router = APIRouter()
 
-# In Evolvefitai_backend/app/api/v1/stats.py
-
-@router.get("/dashboard", response_model=schemas.DashboardStats)
-async def get_dashboard_stats(
+@router.get("/overview", response_model=schemas.DashboardOverviewStats)
+async def get_dashboard_overview(
     current_user: models.User = Depends(current_active_user),
     session: AsyncSession = Depends(get_async_session)
 ):
-    """Get calculated dashboard statistics for the current user."""
+    """Get calculated overview statistics for the main dashboard cards and level progress."""
     
     query = (
         select(
@@ -32,27 +32,67 @@ async def get_dashboard_stats(
     result = await session.execute(query)
     stats = result.first()
 
-    workouts_completed = stats.workouts_completed or 0
-    total_duration_minutes = stats.total_duration_minutes or 0
     total_calories_burned = stats.total_calories_burned or 0
-
-    # --- START: CORRECTED LEVEL CALCULATION ---
     
+    # --- LEVEL PROGRESS CALCULATION ---
     points = total_calories_burned / 2
     level = 1
-    threshold = 100  # Points needed to reach Level 2
+    points_for_current_level = 0
+    points_for_next_level = 100
 
-    # This loop correctly finds the user's level based on the 5x multiplier
-    while points >= threshold:
+    temp_points = points
+    temp_threshold = 100
+    while temp_points >= temp_threshold:
         level += 1
-        # The next threshold is 5 times the current one
-        threshold *= 5
+        points_for_current_level = temp_threshold
+        temp_points -= temp_threshold
+        temp_threshold *= 5
+        points_for_next_level = temp_threshold
 
-    # --- END: CORRECTED LEVEL CALCULATION ---
+    level_progress_data = schemas.LevelProgress(
+        current_level=level,
+        current_points=int(points),
+        points_for_current_level=points_for_current_level,
+        points_for_next_level=points_for_next_level
+    )
 
-    return schemas.DashboardStats(
-        workouts_completed=workouts_completed,
-        total_workout_time_hours=round(total_duration_minutes / 60, 1),
+    return schemas.DashboardOverviewStats(
+        workouts_completed=stats.workouts_completed or 0,
+        total_workout_time_hours=round((stats.total_duration_minutes or 0) / 60, 1),
         total_calories_burned=int(total_calories_burned),
-        fitness_level=f"Level {level}",
+        level_progress=level_progress_data,
+    )
+
+@router.get("/analytics", response_model=schemas.AnalyticsData)
+async def get_analytics_data(
+    aggregate_by: str = Query("day", enum=["day", "week", "month"]),
+    current_user: models.User = Depends(current_active_user),
+    session: AsyncSession = Depends(get_async_session)
+):
+    """Get time-series data for analytics charts (heatmap and calorie graph)."""
+
+    # --- HEATMAP DATA ---
+    heatmap_query = select(func.distinct(func.date(models.WorkoutLog.workout_date))).where(
+        models.WorkoutLog.user_id == current_user.id
+    )
+    heatmap_result = await session.execute(heatmap_query)
+    workout_heatmap = heatmap_result.scalars().all()
+
+    # --- CALORIE TIME-SERIES DATA ---
+    # Use date_trunc to group by day, week, or month
+    calories_query = (
+        select(
+            func.date_trunc(aggregate_by, models.WorkoutLog.workout_date).label("date"),
+            func.sum(models.WorkoutLog.calories_burned).label("value")
+        )
+        .where(models.WorkoutLog.user_id == current_user.id)
+        .group_by(func.date_trunc(aggregate_by, models.WorkoutLog.workout_date))
+        .order_by(func.date_trunc(aggregate_by, models.WorkoutLog.workout_date))
+    )
+    calories_result = await session.execute(calories_query)
+    calorie_timeseries = calories_result.all()
+
+    return schemas.AnalyticsData(
+        calorie_timeseries=[schemas.TimeSeriesDataPoint(date=row.date, value=row.value or 0) for row in calorie_timeseries],
+        workout_heatmap=workout_heatmap
     )
