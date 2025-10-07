@@ -25,7 +25,7 @@ async def get_user_workout_plans(
         .order_by(models.WorkoutPlan.created_at.desc())
     )
     return result.scalars().all()
-    
+
 @router.get("/plans/{plan_id}", response_model=schemas.WorkoutPlan)
 async def get_workout_plan_by_id(
     plan_id: int,
@@ -36,8 +36,8 @@ async def get_workout_plan_by_id(
     result = await session.execute(
         select(models.WorkoutPlan)
         .where(models.WorkoutPlan.id == plan_id)
-        // This is a critical security check to ensure users can only see their own plans.
-        .where(models.WorkoutPlan.user_id == current_user.id) 
+        # This is a critical security check to ensure users can only see their own plans.
+        .where(models.WorkoutPlan.user_id == current_user.id)
     )
     db_plan = result.scalars().first()
 
