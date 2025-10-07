@@ -871,7 +871,7 @@ Output ONLY the following JSON format:
         logger.info("✅ SUCCESS: Rule-based system generated meal plan")
         return meal_plan_data
 
-     async def get_met_value_for_exercise(self, exercise_name: str) -> float:
+    async def get_met_value_for_exercise(self, exercise_name: str) -> float:
         """Gets a MET value for a single exercise name using AI, with a fallback."""
         logger.info(f"🔎 Getting MET value for exercise: '{exercise_name}'")
         
