@@ -80,17 +80,33 @@ async def log_workout(
     current_user: models.User = Depends(current_active_user),
     session: AsyncSession = Depends(get_async_session)
 ):
-    """Log a completed workout with detailed set information."""
+    """Log a completed workout and calculate calories burned."""
     
-    # Pydantic automatically converts the incoming JSON to our schema objects.
-    # To save to a JSON column, we need to convert them back to dicts.
-    exercises_completed_as_dicts = [ex.dict() for ex in workout_log.exercises_completed]
+    # Note: Using .model_dump() is the standard for Pydantic v2+
+    exercises_completed_as_dicts = [ex.model_dump() for ex in workout_log.exercises_completed]
+    
+    # --- START: CALORIE CALCULATION LOGIC ---
+
+    # 1. Get user's weight from their profile, with a default of 70kg as a fallback.
+    user_weight_kg = current_user.weight if current_user.weight else 70.0
+
+    # 2. Get the workout duration in hours.
+    duration_hours = (workout_log.duration_minutes or 0) / 60.0
+
+    # 3. Use our agreed-upon default MET value for general strength training.
+    MET_VALUE = 3.5
+
+    # 4. Calculate the calories burned using the standard formula.
+    calories_burned = round(duration_hours * MET_VALUE * user_weight_kg)
+
+    # --- END: CALORIE CALCULATION LOGIC ---
     
     db_log = models.WorkoutLog(
         user_id=current_user.id,
         workout_plan_id=workout_log.workout_plan_id,
         exercises_completed=exercises_completed_as_dicts,
         duration_minutes=workout_log.duration_minutes,
+        calories_burned=calories_burned,  # 👈 Save the calculated value
         notes=workout_log.notes,
         workout_date=workout_log.workout_date or datetime.utcnow()
     )
