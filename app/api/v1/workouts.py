@@ -25,6 +25,29 @@ async def get_user_workout_plans(
         .order_by(models.WorkoutPlan.created_at.desc())
     )
     return result.scalars().all()
+    
+@router.get("/plans/{plan_id}", response_model=schemas.WorkoutPlan)
+async def get_workout_plan_by_id(
+    plan_id: int,
+    current_user: models.User = Depends(current_active_user),
+    session: AsyncSession = Depends(get_async_session)
+):
+    """Get a single workout plan by its ID for the current user."""
+    result = await session.execute(
+        select(models.WorkoutPlan)
+        .where(models.WorkoutPlan.id == plan_id)
+        // This is a critical security check to ensure users can only see their own plans.
+        .where(models.WorkoutPlan.user_id == current_user.id) 
+    )
+    db_plan = result.scalars().first()
+
+    if db_plan is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Workout plan not found",
+        )
+    
+    return db_plan
 
 @router.post("/plans", response_model=schemas.WorkoutPlan)
 async def create_workout_plan(
