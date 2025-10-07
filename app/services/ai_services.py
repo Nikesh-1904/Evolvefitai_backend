@@ -593,7 +593,7 @@ class AIWorkoutService:
         self.rule_based = RuleBasedWorkoutGenerator()
         self.rule_based_meals = RuleBasedMealPlanGenerator()  # NEW
 
-def create_ai_prompt(self, goal: str, level: str, duration: int, preferences: Dict = None, target_muscles: Optional[List[str]] = None) -> str:
+    def create_ai_prompt(self, goal: str, level: str, duration: int, preferences: Dict = None, target_muscles: Optional[List[str]] = None) -> str:
         prompt = f"Generate a {duration}-minute workout. The user's primary goal is {goal} and their fitness level is {level}."
 
         if target_muscles:
@@ -741,63 +741,63 @@ def create_ai_prompt(self, goal: str, level: str, duration: int, preferences: Di
         diet_restrictions = ", ".join(user.dietary_restrictions) if user.dietary_restrictions else "none"
 
         prompt = f"""Generate a one-day meal plan for a user with the following profile:
-- Fitness Goal: {user.fitness_goal or 'general fitness'}
-- Dietary Restrictions: {diet_restrictions}
-- Target Daily Calories: Approximately {target_calories} kcal
+            - Fitness Goal: {user.fitness_goal or 'general fitness'}
+            - Dietary Restrictions: {diet_restrictions}
+            - Target Daily Calories: Approximately {target_calories} kcal
 
-Requirements:
-- The meal plan must be structured with four meals: Breakfast, Lunch, Dinner, and Snacks
-- For EACH meal, provide a name, a list of ingredients with quantities, simple instructions, and estimated calories, protein, carbs, and fat.
-- The total calories for the day must be close to the {target_calories} kcal target.
-- Calculate and provide total target_calories, target_protein, target_carbs, and target_fat for the day.
+            Requirements:
+            - The meal plan must be structured with four meals: Breakfast, Lunch, Dinner, and Snacks
+            - For EACH meal, provide a name, a list of ingredients with quantities, simple instructions, and estimated calories, protein, carbs, and fat.
+            - The total calories for the day must be close to the {target_calories} kcal target.
+            - Calculate and provide total target_calories, target_protein, target_carbs, and target_fat for the day.
 
-Output ONLY the following JSON format:
+            Output ONLY the following JSON format:
 
-{{
-  "name": "AI Generated Meal Plan",
-  "target_calories": {target_calories},
-  "target_protein": 150,
-  "target_carbs": 200,
-  "target_fat": 60,
-  "meals": {{
-    "breakfast": {{
-      "name": "Hearty Oatmeal",
-      "ingredients": ["1 cup oats", "1/2 cup berries"],
-      "instructions": "Mix and cook.",
-      "calories": 400,
-      "protein": 30,
-      "carbs": 50,
-      "fat": 10
-    }},
-    "lunch": {{
-      "name": "Grilled Chicken Salad",
-      "ingredients": ["150g chicken breast", "2 cups greens"],
-      "instructions": "Combine.",
-      "calories": 500,
-      "protein": 40,
-      "carbs": 20,
-      "fat": 25
-    }},
-    "dinner": {{
-      "name": "Salmon with Quinoa",
-      "ingredients": ["150g salmon", "1 cup quinoa"],
-      "instructions": "Bake and serve.",
-      "calories": 600,
-      "protein": 45,
-      "carbs": 50,
-      "fat": 20
-    }},
-    "snacks": {{
-      "name": "Greek Yogurt",
-      "ingredients": ["1 cup yogurt", "1/4 cup nuts"],
-      "instructions": "Combine.",
-      "calories": 300,
-      "protein": 25,
-      "carbs": 15,
-      "fat": 15
-    }}
-  }}
-}}"""
+            {{
+            "name": "AI Generated Meal Plan",
+            "target_calories": {target_calories},
+            "target_protein": 150,
+            "target_carbs": 200,
+            "target_fat": 60,
+            "meals": {{
+                "breakfast": {{
+                "name": "Hearty Oatmeal",
+                "ingredients": ["1 cup oats", "1/2 cup berries"],
+                "instructions": "Mix and cook.",
+                "calories": 400,
+                "protein": 30,
+                "carbs": 50,
+                "fat": 10
+                }},
+                "lunch": {{
+                "name": "Grilled Chicken Salad",
+                "ingredients": ["150g chicken breast", "2 cups greens"],
+                "instructions": "Combine.",
+                "calories": 500,
+                "protein": 40,
+                "carbs": 20,
+                "fat": 25
+                }},
+                "dinner": {{
+                "name": "Salmon with Quinoa",
+                "ingredients": ["150g salmon", "1 cup quinoa"],
+                "instructions": "Bake and serve.",
+                "calories": 600,
+                "protein": 45,
+                "carbs": 50,
+                "fat": 20
+                }},
+                "snacks": {{
+                "name": "Greek Yogurt",
+                "ingredients": ["1 cup yogurt", "1/4 cup nuts"],
+                "instructions": "Combine.",
+                "calories": 300,
+                "protein": 25,
+                "carbs": 15,
+                "fat": 15
+                }}
+            }}
+            }}"""
         return prompt
 
     async def generate_meal_plan(self, user: models.User, request: schemas.MealPlanRequest) -> Dict:
