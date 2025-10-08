@@ -45,21 +45,21 @@ if google_oauth_client:
 
     @router.get("/google/authorize", tags=["auth"])
     async def google_authorize(request: Request):
-    """Generate and return a redirect response to Google's authorization URL."""
-    if not google_oauth_client:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, 
-            detail="Google OAuth is not configured"
+        """Generate and return a redirect response to Google's authorization URL."""
+        if not google_oauth_client:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, 
+                detail="Google OAuth is not configured"
+            )
+        
+        redirect_url = str(request.url_for("google_callback"))
+        
+        authorization_url = await google_oauth_client.get_authorization_url(
+            redirect_url,
+            scope=["openid", "email", "profile"],
         )
-    
-    redirect_url = str(request.url_for("google_callback"))
-    
-    authorization_url = await google_oauth_client.get_authorization_url(
-        redirect_url,
-        scope=["openid", "email", "profile"],
-    )
-    # This is the key change: instead of returning JSON, we redirect the user.
-    return RedirectResponse(url=authorization_url)
+        # This is the key change: instead of returning JSON, we redirect the user.
+        return RedirectResponse(url=authorization_url)
 
     @router.get("/google/callback", tags=["auth"])
     async def google_callback(
