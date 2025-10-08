@@ -63,6 +63,7 @@ async def get_dashboard_overview(
         level_progress=level_progress_data,
     )
 
+# In stats.py
 @router.get("/analytics", response_model=schemas.AnalyticsData)
 async def get_analytics_data(
     aggregate_by: str = Query("day", enum=["day", "week", "month"]),
@@ -71,7 +72,7 @@ async def get_analytics_data(
 ):
     """Get time-series data for analytics charts (heatmap and calorie graph)."""
 
-    # --- HEATMAP DATA ---
+    # --- HEATMAP DATA (Corrected) ---
     heatmap_query = select(func.distinct(func.date(models.WorkoutLog.workout_date))).where(
         models.WorkoutLog.user_id == current_user.id
     )
@@ -79,7 +80,6 @@ async def get_analytics_data(
     workout_heatmap = heatmap_result.scalars().all()
 
     # --- CALORIE TIME-SERIES DATA ---
-    # Use date_trunc to group by day, week, or month
     calories_query = (
         select(
             func.date_trunc(aggregate_by, models.WorkoutLog.workout_date).label("date"),
@@ -87,7 +87,7 @@ async def get_analytics_data(
         )
         .where(models.WorkoutLog.user_id == current_user.id)
         .group_by(func.date_trunc(aggregate_by, models.WorkoutLog.workout_date))
-        .order_by(func.date_trunc(aggregate_by, models.WorkoutLog.workout_date))
+        .order_by(func.date_trunc(aggregate_by, models.WorkoutLog.workout_date).asc())
     )
     calories_result = await session.execute(calories_query)
     calorie_timeseries = calories_result.all()
