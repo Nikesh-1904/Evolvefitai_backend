@@ -58,7 +58,7 @@ if google_oauth_client:
             redirect_url,
             scope=["openid", "email", "profile"],
         )
-        # This is the key change: instead of returning JSON, we redirect the user.
+        # This directly redirects the user's browser to Google.
         return RedirectResponse(url=authorization_url)
 
     @router.get("/google/callback", tags=["auth"])
