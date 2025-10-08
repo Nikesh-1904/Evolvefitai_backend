@@ -26,7 +26,7 @@ bcrypt==3.2.0
 # --- AI & Other Libraries ---
 numpy==1.24.3
 requests==2.31.0
-python-multipart==0.0.6
+python-multipart==0.0.9
 
 # --- Utilities ---
 python-dateutil==2.8.2
