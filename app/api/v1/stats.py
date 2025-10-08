@@ -64,6 +64,7 @@ async def get_dashboard_overview(
     )
 
 # In stats.py
+# In stats.py
 @router.get("/analytics", response_model=schemas.AnalyticsData)
 async def get_analytics_data(
     aggregate_by: str = Query("day", enum=["day", "week", "month"]),
@@ -72,22 +73,25 @@ async def get_analytics_data(
 ):
     """Get time-series data for analytics charts (heatmap and calorie graph)."""
 
-    # --- HEATMAP DATA (Corrected) ---
+    # --- HEATMAP DATA ---
     heatmap_query = select(func.distinct(func.date(models.WorkoutLog.workout_date))).where(
         models.WorkoutLog.user_id == current_user.id
     )
     heatmap_result = await session.execute(heatmap_query)
     workout_heatmap = heatmap_result.scalars().all()
 
-    # --- CALORIE TIME-SERIES DATA ---
+    # --- CALORIE TIME-SERIES DATA (Corrected) ---
+    # The 'date_trunc' function needs to be used in both select and group_by
+    date_agg = func.date_trunc(aggregate_by, models.WorkoutLog.workout_date)
+    
     calories_query = (
         select(
-            func.date_trunc(aggregate_by, models.WorkoutLog.workout_date).label("date"),
+            date_agg.label("date"),
             func.sum(models.WorkoutLog.calories_burned).label("value")
         )
         .where(models.WorkoutLog.user_id == current_user.id)
-        .group_by(func.date_trunc(aggregate_by, models.WorkoutLog.workout_date))
-        .order_by(func.date_trunc(aggregate_by, models.WorkoutLog.workout_date).asc())
+        .group_by(date_agg)
+        .order_by(date_agg.asc())
     )
     calories_result = await session.execute(calories_query)
     calorie_timeseries = calories_result.all()
