@@ -144,3 +144,24 @@ async def get_exercise_progression(
                 break 
                 
     return progression_data
+
+@router.get("/logged-exercises", response_model=List[str])
+async def get_logged_exercises(
+    current_user: models.User = Depends(current_active_user),
+    session: AsyncSession = Depends(get_async_session)
+):
+    """Get a list of all unique exercise names from a user's logs."""
+    query = (
+        select(models.WorkoutLog.exercises_completed)
+        .where(models.WorkoutLog.user_id == current_user.id)
+    )
+    result = await session.execute(query)
+    all_exercise_lists = result.scalars().all()
+
+    unique_exercise_names = set()
+    for exercise_list in all_exercise_lists:
+        for exercise in exercise_list:
+            if "name" in exercise:
+                unique_exercise_names.add(exercise["name"])
+
+    return sorted(list(unique_exercise_names))
