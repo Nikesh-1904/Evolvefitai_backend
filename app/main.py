@@ -20,6 +20,8 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    allow_redirects=True, # 👈 THIS IS THE FIX
+
 )
 
 # Include API routes
