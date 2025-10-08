@@ -17,7 +17,7 @@ aiosqlite==0.19.0
 
 # --- Authentication ---
 # Corrected the version from 1.2 to 12.1.2
-fastapi-users[sqlalchemy,oauth]==12.1.2
+fastapi-users[sqlalchemy,oauth]==13.0.0
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
 httpx-oauth==0.16.1
