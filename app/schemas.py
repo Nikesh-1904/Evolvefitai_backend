@@ -185,6 +185,14 @@ class AnalyticsData(BaseModel):
     calorie_timeseries: List[TimeSeriesDataPoint]
     workout_heatmap: List[date]
 
+class ExerciseSetData(BaseModel):
+    reps: int
+    weight: float
+
+class ExerciseProgressionDataPoint(BaseModel):
+    workout_date: date
+    total_volume: float
+    sets: List[ExerciseSetData]
 
 class ExerciseTip(ExerciseTipBase):
     id: int
