@@ -593,7 +593,6 @@ class AIWorkoutService:
         self.rule_based = RuleBasedWorkoutGenerator()
         self.rule_based_meals = RuleBasedMealPlanGenerator()  # NEW
 
-# In ai_services.py, inside the AIWorkoutService class
 
     def create_ai_prompt(
             self, 
@@ -607,19 +606,19 @@ class AIWorkoutService:
                 
             prompt = f"Generate a {duration}-minute workout."
             if workout_type:
-            prompt += f" It should be a '{workout_type}' style workout (e.g., 'at-home bodyweight', 'gym dumbbell workout', 'yoga flow')."
+                prompt += f" It should be a '{workout_type}' style workout (e.g., 'at-home bodyweight', 'gym dumbbell workout', 'yoga flow')."
 
-            prompt += f" The user's primary goal is {goal} and their fitness level is {level}."
+                prompt += f" The user's primary goal is {goal} and their fitness level is {level}."
 
             if target_muscles:
-            muscle_list = ", ".join(target_muscles)
-            prompt += f" The workout MUST primarily focus on the following muscle groups: {muscle_list}."
+                muscle_list = ", ".join(target_muscles)
+                prompt += f" The workout MUST primarily focus on the following muscle groups: {muscle_list}."
 
             if num_exercises:
-            prompt += f" The workout MUST contain exactly {num_exercises} exercises."
+                prompt += f" The workout MUST contain exactly {num_exercises} exercises."
 
 
-            prompt += """
+                prompt += """
 
         Requirements:
         - Provide a creative and motivating name for the workout.
@@ -645,7 +644,7 @@ class AIWorkoutService:
             }
         ]
         }"""
-        return prompt
+            return prompt
 
     def generate_workout_sync(
         self, 

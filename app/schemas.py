@@ -221,6 +221,8 @@ class WorkoutGenerationRequest(BaseModel):
     user_preferences: Optional[Dict[str, Any]] = {}
     duration_minutes: Optional[int] = 45
     target_muscle_groups: Optional[List[str]] = None
+    num_exercises: Optional[int] = None  # 👈 ADD THIS LINE
+    workout_type: Optional[str] = None   # 👈 ADD THIS LINE
 
 class PlateauAnalysis(BaseModel):
     is_plateau: bool
