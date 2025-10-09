@@ -15,6 +15,7 @@ router = APIRouter()
 
 # In Evolvefitai_backend/app/api/v1/stats.py
 
+# In stats.py
 @router.get("/overview", response_model=schemas.DashboardOverviewStats)
 async def get_dashboard_overview(
     current_user: models.User = Depends(current_active_user),
@@ -23,8 +24,9 @@ async def get_dashboard_overview(
     """Get calculated overview statistics for the main dashboard cards and level progress."""
     
     today = date.today()
+    yesterday = today - timedelta(days=1)
 
-    # --- Query 1: Get LIFETIME stats for levels and total workouts ---
+    # --- Query for LIFETIME stats ---
     lifetime_query = (
         select(
             func.count(models.WorkoutLog.id).label("workouts_completed"),
@@ -35,13 +37,11 @@ async def get_dashboard_overview(
     lifetime_result = await session.execute(lifetime_query)
     lifetime_stats = lifetime_result.first()
     
-    total_lifetime_calories = lifetime_stats.total_calories_burned or 0
-
-    # --- Query 2: Get TODAY'S stats for the dashboard cards ---
+    # --- Query for TODAY'S stats ---
     today_query = (
         select(
-            func.sum(models.WorkoutLog.duration_minutes).label("today_duration"),
-            func.sum(models.WorkoutLog.calories_burned).label("today_calories")
+            func.sum(models.WorkoutLog.duration_minutes).label("duration"),
+            func.sum(models.WorkoutLog.calories_burned).label("calories")
         )
         .where(models.WorkoutLog.user_id == current_user.id)
         .where(func.date(models.WorkoutLog.workout_date) == today)
@@ -49,20 +49,43 @@ async def get_dashboard_overview(
     today_result = await session.execute(today_query)
     today_stats = today_result.first()
 
-    # --- LEVEL PROGRESS CALCULATION (uses lifetime calories) ---
+    # --- Query for YESTERDAY'S stats (for comparison) ---
+    yesterday_query = (
+        select(
+            func.sum(models.WorkoutLog.duration_minutes).label("duration"),
+            func.sum(models.WorkoutLog.calories_burned).label("calories")
+        )
+        .where(models.WorkoutLog.user_id == current_user.id)
+        .where(func.date(models.WorkoutLog.workout_date) == yesterday)
+    )
+    yesterday_result = await session.execute(yesterday_query)
+    yesterday_stats = yesterday_result.first()
+
+    # --- Helper function to calculate percentage change ---
+    def calculate_change(today_val, yesterday_val):
+        today_val = today_val or 0
+        yesterday_val = yesterday_val or 0
+        if yesterday_val == 0:
+            return 100.0 if today_val > 0 else 0.0 # Assign 100% increase if yesterday was 0
+        return ((today_val - yesterday_val) / yesterday_val) * 100
+
+    # Calculate changes
+    calories_change = calculate_change(today_stats.calories, yesterday_stats.calories)
+    time_change = calculate_change(today_stats.duration, yesterday_stats.duration)
+
+    # ... (Level progress calculation remains the same) ...
+    total_lifetime_calories = lifetime_stats.total_calories_burned or 0
     points = total_lifetime_calories / 2
     level = 1
     points_for_current_level = 0
     points_for_next_level = 100
-    
-    # This loop correctly finds the user's level based on the 5x multiplier
     temp_threshold = 100
     while points >= temp_threshold:
         level += 1
         points_for_current_level = temp_threshold
         temp_threshold *= 5
         points_for_next_level = temp_threshold
-
+    
     level_progress_data = schemas.LevelProgress(
         current_level=level,
         current_points=int(points),
@@ -72,13 +95,12 @@ async def get_dashboard_overview(
 
     # --- Construct the final response ---
     return schemas.DashboardOverviewStats(
-        # These stats are for TODAY
         total_calories_burned=int(today_stats.today_calories or 0),
         total_workout_time_hours=round((today_stats.today_duration or 0) / 60, 1),
-        
-        # These stats are LIFETIME
         workouts_completed=lifetime_stats.workouts_completed or 0,
         level_progress=level_progress_data,
+        calories_change_percent=calories_change,
+        time_change_percent=time_change
     )
 
 # In stats.py

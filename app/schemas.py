@@ -176,6 +176,8 @@ class DashboardOverviewStats(BaseModel):
     total_workout_time_hours: float
     total_calories_burned: int
     level_progress: LevelProgress
+    calories_change_percent: float  # 👈 ADD THIS
+    time_change_percent: float
 
 class TimeSeriesDataPoint(BaseModel):
     date: date
