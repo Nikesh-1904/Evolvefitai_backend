@@ -29,6 +29,7 @@ class UserRead(schemas.BaseUser[uuid.UUID]):
     experience_level: Optional[str] = None
     activity_level: Optional[str] = None
     dietary_restrictions: Optional[List[str]] = []
+    has_completed_onboarding: bool # 👈 ADD THIS LINE
     is_active: bool
     is_verified: bool
     created_at: datetime
@@ -53,6 +54,7 @@ class UserUpdate(schemas.BaseUserUpdate):
     experience_level: Optional[str] = None
     activity_level: Optional[str] = None
     dietary_restrictions: Optional[List[str]] = []
+    has_completed_onboarding: Optional[bool] = None # 👈 ADD THIS LINE
 
     @validator("username")
     def username_must_not_be_empty(cls, v):

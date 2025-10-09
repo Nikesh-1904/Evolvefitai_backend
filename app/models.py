@@ -30,6 +30,7 @@ class User(SQLAlchemyBaseUserTableUUID, Base):
     
     # Preferences
     dietary_restrictions = Column(JSON, default=[])
+    has_completed_onboarding = Column(Boolean, default=False, nullable=False)
     
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
