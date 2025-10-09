@@ -13,6 +13,8 @@ from app import models, schemas
 
 router = APIRouter()
 
+# In Evolvefitai_backend/app/api/v1/stats.py
+
 @router.get("/overview", response_model=schemas.DashboardOverviewStats)
 async def get_dashboard_overview(
     current_user: models.User = Depends(current_active_user),
@@ -20,32 +22,44 @@ async def get_dashboard_overview(
 ):
     """Get calculated overview statistics for the main dashboard cards and level progress."""
     
-    query = (
+    today = date.today()
+
+    # --- Query 1: Get LIFETIME stats for levels and total workouts ---
+    lifetime_query = (
         select(
             func.count(models.WorkoutLog.id).label("workouts_completed"),
-            func.sum(models.WorkoutLog.duration_minutes).label("total_duration_minutes"),
             func.sum(models.WorkoutLog.calories_burned).label("total_calories_burned")
         )
         .where(models.WorkoutLog.user_id == current_user.id)
     )
+    lifetime_result = await session.execute(lifetime_query)
+    lifetime_stats = lifetime_result.first()
     
-    result = await session.execute(query)
-    stats = result.first()
+    total_lifetime_calories = lifetime_stats.total_calories_burned or 0
 
-    total_calories_burned = stats.total_calories_burned or 0
-    
-    # --- LEVEL PROGRESS CALCULATION ---
-    points = total_calories_burned / 2
+    # --- Query 2: Get TODAY'S stats for the dashboard cards ---
+    today_query = (
+        select(
+            func.sum(models.WorkoutLog.duration_minutes).label("today_duration"),
+            func.sum(models.WorkoutLog.calories_burned).label("today_calories")
+        )
+        .where(models.WorkoutLog.user_id == current_user.id)
+        .where(func.date(models.WorkoutLog.workout_date) == today)
+    )
+    today_result = await session.execute(today_query)
+    today_stats = today_result.first()
+
+    # --- LEVEL PROGRESS CALCULATION (uses lifetime calories) ---
+    points = total_lifetime_calories / 2
     level = 1
     points_for_current_level = 0
     points_for_next_level = 100
-
-    temp_points = points
+    
+    # This loop correctly finds the user's level based on the 5x multiplier
     temp_threshold = 100
-    while temp_points >= temp_threshold:
+    while points >= temp_threshold:
         level += 1
         points_for_current_level = temp_threshold
-        temp_points -= temp_threshold
         temp_threshold *= 5
         points_for_next_level = temp_threshold
 
@@ -56,14 +70,17 @@ async def get_dashboard_overview(
         points_for_next_level=points_for_next_level
     )
 
+    # --- Construct the final response ---
     return schemas.DashboardOverviewStats(
-        workouts_completed=stats.workouts_completed or 0,
-        total_workout_time_hours=round((stats.total_duration_minutes or 0) / 60, 1),
-        total_calories_burned=int(total_calories_burned),
+        # These stats are for TODAY
+        total_calories_burned=int(today_stats.today_calories or 0),
+        total_workout_time_hours=round((today_stats.today_duration or 0) / 60, 1),
+        
+        # These stats are LIFETIME
+        workouts_completed=lifetime_stats.workouts_completed or 0,
         level_progress=level_progress_data,
     )
 
-# In stats.py
 # In stats.py
 @router.get("/analytics", response_model=schemas.AnalyticsData)
 async def get_analytics_data(
