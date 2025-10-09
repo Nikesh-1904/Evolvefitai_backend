@@ -595,53 +595,56 @@ class AIWorkoutService:
 
 
     def create_ai_prompt(
-            self, 
-            goal: str, 
-            level: str, 
-            duration: int, 
-            num_exercises: Optional[int] = None,
-            workout_type: Optional[str] = None,
-            target_muscles: Optional[List[str]] = None
-            ) -> str:
-                
-            prompt = f"Generate a {duration}-minute workout."
-            if workout_type:
-                prompt += f" It should be a '{workout_type}' style workout (e.g., 'at-home bodyweight', 'gym dumbbell workout', 'yoga flow')."
-                prompt += f" The user's primary goal is {goal} and their fitness level is {level}."
+        self,
+        goal: str,
+        level: str,
+        duration: int,
+        num_exercises: Optional[int] = None,
+        workout_type: Optional[str] = None,
+        target_muscles: Optional[List[str]] = None
+    ) -> str:
+        
+        # Start of the prompt with core information
+        prompt = f"Generate a {duration}-minute workout for a user with a fitness level of '{level}' whose primary goal is '{goal}'."
 
-            if target_muscles:
-                muscle_list = ", ".join(target_muscles)
-                prompt += f" The workout MUST primarily focus on the following muscle groups: {muscle_list}."
+        # Add optional details based on filters
+        if workout_type:
+            prompt += f" The workout should be a '{workout_type}' style (e.g., 'at-home bodyweight', 'gym dumbbell workout', 'yoga flow')."
 
-            if num_exercises:
-                prompt += f" The workout MUST contain exactly {num_exercises} exercises."
-                prompt += """
+        if target_muscles:
+            muscle_list = ", ".join(target_muscles)
+            prompt += f" The workout MUST primarily focus on these muscle groups: {muscle_list}."
 
-                    Requirements:
-                    - Provide a creative and motivating name for the workout.
-                    - Provide a brief description of the overall workout.
-                    - For EACH exercise, provide the following details: name, sets, reps, instructions, a list of primary muscle_groups targeted, and an estimated met_value (Metabolic Equivalent of Task).
+        if num_exercises:
+            prompt += f" The workout MUST contain exactly {num_exercises} exercises."
 
-                    Output ONLY the following JSON format. Do NOT include any text before or after the JSON object:
+        # Add the formatting requirements at the end - this is always required
+        prompt += """
 
-                    {
-                    "name": "Workout Name",
-                    "description": "A brief overview of the workout.",
-                    "difficulty_level": "{level}",
-                    "estimated_duration": {duration},
-                    "estimated_calories": 250,
-                    "exercises": [
-                        {
-                        "name": "Exercise Name",
-                        "sets": 3,
-                        "reps": "8-12",
-                        "instructions": "Detailed instructions on how to perform this exercise.",
-                        "muscle_groups": ["chest", "triceps"],
-                        "met_value": 6.0
-                        }
-                    ]
-                    }"""
-            return prompt
+Requirements:
+- Provide a creative and motivating name for the workout.
+- Provide a brief description of the overall workout.
+- For EACH exercise, provide: name, sets, reps, detailed instructions, a list of primary muscle_groups, and an estimated met_value (Metabolic Equivalent of Task).
+- Respond ONLY with a valid JSON object. Do not include any text, markdown, or explanations before or after the JSON.
+
+Example JSON format:
+{
+  "name": "Example Workout Name",
+  "description": "A brief overview of the workout.",
+  "difficulty_level": "intermediate",
+  "estimated_duration": 45,
+  "exercises": [
+    {
+      "name": "Example Exercise",
+      "sets": 3,
+      "reps": "10-12",
+      "instructions": "Detailed instructions...",
+      "muscle_groups": ["chest", "triceps"],
+      "met_value": 7.0
+    }
+  ]
+}"""
+        return prompt
 
     def generate_workout_sync(
         self, 
