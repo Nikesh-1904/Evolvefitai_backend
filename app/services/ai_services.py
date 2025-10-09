@@ -593,57 +593,77 @@ class AIWorkoutService:
         self.rule_based = RuleBasedWorkoutGenerator()
         self.rule_based_meals = RuleBasedMealPlanGenerator()  # NEW
 
-    def create_ai_prompt(self, goal: str, level: str, duration: int, preferences: Dict = None, target_muscles: Optional[List[str]] = None) -> str:
-        prompt = f"Generate a {duration}-minute workout. The user's primary goal is {goal} and their fitness level is {level}."
+# In ai_services.py, inside the AIWorkoutService class
 
-        if target_muscles:
+    def create_ai_prompt(
+            self, 
+            goal: str, 
+            level: str, 
+            duration: int, 
+            num_exercises: Optional[int] = None,
+            workout_type: Optional[str] = None,
+            target_muscles: Optional[List[str]] = None
+            ) -> str:
+                
+            prompt = f"Generate a {duration}-minute workout."
+            if workout_type:
+            prompt += f" It should be a '{workout_type}' style workout (e.g., 'at-home bodyweight', 'gym dumbbell workout', 'yoga flow')."
+
+            prompt += f" The user's primary goal is {goal} and their fitness level is {level}."
+
+            if target_muscles:
             muscle_list = ", ".join(target_muscles)
             prompt += f" The workout MUST primarily focus on the following muscle groups: {muscle_list}."
 
-        prompt += """
+            if num_exercises:
+            prompt += f" The workout MUST contain exactly {num_exercises} exercises."
 
-            Requirements:
-            - Provide a creative and motivating name for the workout.
-            - The number of exercises should be appropriate for the duration and fitness level.
-            - Provide a brief description of the overall workout.
-            - For EACH exercise, provide the following details: name, sets, reps, instructions, a list of primary muscle_groups targeted, and an estimated met_value (Metabolic Equivalent of Task).
 
-            Output ONLY the following JSON format. Do NOT include any text before or after the JSON object:
+            prompt += """
 
+        Requirements:
+        - Provide a creative and motivating name for the workout.
+        - Provide a brief description of the overall workout.
+        - For EACH exercise, provide the following details: name, sets, reps, instructions, a list of primary muscle_groups targeted, and an estimated met_value (Metabolic Equivalent of Task).
+
+        Output ONLY the following JSON format. Do NOT include any text before or after the JSON object:
+
+        {
+        "name": "Workout Name",
+        "description": "A brief overview of the workout.",
+        "difficulty_level": "{level}",
+        "estimated_duration": {duration},
+        "estimated_calories": 250,
+        "exercises": [
             {
-            "name": "Workout Name",
-            "description": "A brief overview of the workout.",
-            "difficulty_level": "{level}",
-            "estimated_duration": {duration},
-            "estimated_calories": 250,
-            "exercises": [
-                {
-                "name": "Exercise Name",
-                "sets": 3,
-                "reps": "8-12",
-                "instructions": "Detailed instructions on how to perform this exercise.",
-                "muscle_groups": ["chest", "triceps"],
-                "met_value": 6.0
-                }
-            ]
-            }"""
-
-        if preferences:
-            prompt += f"\nPreferences: {preferences}"
-
+            "name": "Exercise Name",
+            "sets": 3,
+            "reps": "8-12",
+            "instructions": "Detailed instructions on how to perform this exercise.",
+            "muscle_groups": ["chest", "triceps"],
+            "met_value": 6.0
+            }
+        ]
+        }"""
         return prompt
 
-    def generate_workout_sync(self, goal: str, level: str, duration: int = 30, preferences: Dict = None, target_muscles: Optional[List[str]] = None) -> Dict:
-        start_time = time.time()
-
-        logger.info("=" * 80)
-        logger.info("🚀 STARTING AI WORKOUT GENERATION")
+    def generate_workout_sync(
+        self, 
+        goal: str, 
+        level: str, 
+        duration: int = 30, 
+        num_exercises: Optional[int] = None,
+        workout_type: Optional[str] = None,
+        target_muscles: Optional[List[str]] = None
+    ) -> Dict:
+        # ... (logging code remains the same)
         logger.info(f"🎯 Goal: {goal} | Level: {level} | Duration: {duration}min")
-        if target_muscles:
-            logger.info(f"💪 Targeting: {', '.join(target_muscles)}")
+        if num_exercises: logger.info(f"🔢 Exercises: {num_exercises}")
+        if workout_type: logger.info(f"🏡 Type: {workout_type}")
+        if target_muscles: logger.info(f"💪 Targeting: {', '.join(target_muscles)}")
         logger.info("=" * 80)
 
-        prompt = self.create_ai_prompt(goal, level, duration, preferences, target_muscles)
+        prompt = self.create_ai_prompt(goal, level, duration, num_exercises, workout_type, target_muscles)
 
         # Method 1: Try Groq AI first
         logger.info("🔥 Attempting Method 1: Groq AI (Fastest)")
@@ -711,21 +731,25 @@ class AIWorkoutService:
         logger.info(f"✅ SUCCESS: Rule-based system generated workout")
         return workout_data
 
-    async def generate_workout(self, user: models.User, duration_minutes: int, target_muscles: Optional[List[str]] = None) -> Dict:
-        logger.info("🚀 Starting AI workout generation process with data validation...")
+    async def generate_workout(
+        self, 
+        user: models.User, 
+        duration_minutes: int, 
+        num_exercises: Optional[int] = None,
+        workout_type: Optional[str] = None,
+        target_muscles: Optional[List[str]] = None
+    ) -> Dict:
+        logger.info("🚀 Starting AI workout generation process...")
 
-        goal = getattr(user, 'fitness_goal', None) or 'general_fitness'
-        level = getattr(user, 'experience_level', None) or 'intermediate'
-
-        logger.info(f"Using: Goal={goal}, Level={level} for AI prompt.")
+        goal = getattr(user, 'fitness_goal', 'general_fitness')
+        level = getattr(user, 'experience_level', 'intermediate')
 
         loop = asyncio.get_event_loop()
         result = await loop.run_in_executor(
             None, 
             self.generate_workout_sync, 
-            goal, level, duration_minutes, None, target_muscles
+            goal, level, duration_minutes, num_exercises, workout_type, target_muscles
         )
-
         result.update({
             "description": f"AI-generated {goal} workout for {level} level",
             "estimated_duration": duration_minutes

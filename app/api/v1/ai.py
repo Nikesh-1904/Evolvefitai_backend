@@ -244,9 +244,7 @@ async def generate_workout_plan(
     logger.info(f"📧 User Email: {current_user.email}")
     logger.info(f"🕒 Request Time: {datetime.now().isoformat()}")
     logger.info(f"⏱️  Duration: {request.duration_minutes} minutes")
-    if request.target_muscle_groups:
-        logger.info(f"💪 Targeting: {', '.join(request.target_muscle_groups)}")
-
+    logger.info(f"💪 Targeting: {', '.join(request.target_muscle_groups)}" if request.target_muscle_groups else "💪 Targeting: Not specified")
     logger.info(f"👤 User Profile Summary:")
     logger.info(f"   - Age: {getattr(current_user, 'age', 'Not set')}")
     logger.info(f"   - Weight: {getattr(current_user, 'weight', 'Not set')}kg") 
@@ -254,6 +252,10 @@ async def generate_workout_plan(
     logger.info(f"   - Goal: {getattr(current_user, 'fitness_goal', 'Not set')}")
     logger.info(f"   - Level: {getattr(current_user, 'experience_level', 'Not set')}")
     logger.info(f"   - Activity: {getattr(current_user, 'activity_level', 'Not set')}")
+    logger.info(f"🔢 Exercises Requested: {request.num_exercises}" if request.num_exercises else "🔢 Exercises Requested: AI decides")
+    logger.info(f"🏡 Workout Type: {request.workout_type}" if request.workout_type else "🏡 Workout Type: Not specified")
+
+
     logger.info("=" * 100)
 
     start_time = datetime.now()
@@ -261,10 +263,13 @@ async def generate_workout_plan(
     try:
         logger.info("🤖 Starting AI workout generation process...")
 
+        # 👇 Pass the new filters to the AI service
         workout_data = await ai_workout_generator.generate_workout(
             user=current_user,
             duration_minutes=request.duration_minutes,
-            target_muscles=request.target_muscle_groups
+            target_muscles=request.target_muscle_groups,
+            num_exercises=request.num_exercises,
+            workout_type=request.workout_type
         )
 
         generation_time = (datetime.now() - start_time).total_seconds()
