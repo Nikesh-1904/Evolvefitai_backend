@@ -604,13 +604,21 @@ class AIWorkoutService:
         target_muscles: Optional[List[str]] = None
     ) -> str:
         
-        # Start of the prompt with core information
-        prompt = f"Generate a {duration}-minute workout for a user with a fitness level of '{level}' whose primary goal is '{goal}'."
+        # --- START: NEW PROMPT LOGIC ---
 
-        # Add optional details based on filters
+        # Prioritize the explicit workout_type over the user's default goal if specified.
         if workout_type:
-            prompt += f" The workout should be a '{workout_type}' style (e.g., 'at-home bodyweight', 'gym dumbbell workout', 'yoga flow')."
+            prompt = f"Generate a {duration}-minute '{workout_type}' workout (e.g., 'at-home bodyweight', 'gym dumbbell workout', 'yoga flow')."
+            # Only add the user's goal if it's not a conflicting type like Yoga or Cardio
+            if workout_type.lower() not in ['yoga', 'cardio', 'hiit']:
+                 prompt += f" The user's secondary goal is '{goal}'."
+        else:
+            # If no specific type, build the prompt around the user's primary goal.
+            prompt = f"Generate a {duration}-minute workout for a user whose primary goal is '{goal}'."
 
+        prompt += f" The user's fitness level is '{level}'."
+
+        # Add other filters
         if target_muscles:
             muscle_list = ", ".join(target_muscles)
             prompt += f" The workout MUST primarily focus on these muscle groups: {muscle_list}."
@@ -618,29 +626,28 @@ class AIWorkoutService:
         if num_exercises:
             prompt += f" The workout MUST contain exactly {num_exercises} exercises."
 
-        # Add the formatting requirements at the end - this is always required
+        # Add the formatting requirements at the end, including the keyword "json"
         prompt += """
 
 Requirements:
 - Provide a creative and motivating name for the workout.
-- Provide a brief description of the overall workout.
-- For EACH exercise, provide: name, sets, reps, detailed instructions, a list of primary muscle_groups, and an estimated met_value (Metabolic Equivalent of Task).
-- Respond ONLY with a valid JSON object. Do not include any text, markdown, or explanations before or after the JSON.
+- For EACH exercise, provide: name, sets, reps, detailed instructions, a list of primary muscle_groups, and an estimated met_value.
+- Respond ONLY with a valid JSON object. Do not include any other text.
 
 Example JSON format:
 {
-  "name": "Example Workout Name",
-  "description": "A brief overview of the workout.",
+  "name": "Zenith Yoga Flow",
+  "description": "A flowing yoga sequence to build strength and flexibility.",
   "difficulty_level": "intermediate",
   "estimated_duration": 45,
   "exercises": [
     {
-      "name": "Example Exercise",
-      "sets": 3,
-      "reps": "10-12",
-      "instructions": "Detailed instructions...",
-      "muscle_groups": ["chest", "triceps"],
-      "met_value": 7.0
+      "name": "Sun Salutation A",
+      "sets": 5,
+      "reps": "1 flow",
+      "instructions": "Flow through chaturanga, upward-facing dog, and downward-facing dog.",
+      "muscle_groups": ["full body", "core"],
+      "met_value": 4.0
     }
   ]
 }"""
