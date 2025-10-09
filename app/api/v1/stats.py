@@ -15,7 +15,6 @@ router = APIRouter()
 
 # In Evolvefitai_backend/app/api/v1/stats.py
 
-# In stats.py
 @router.get("/overview", response_model=schemas.DashboardOverviewStats)
 async def get_dashboard_overview(
     current_user: models.User = Depends(current_active_user),
@@ -61,17 +60,17 @@ async def get_dashboard_overview(
     yesterday_result = await session.execute(yesterday_query)
     yesterday_stats = yesterday_result.first()
 
-    # --- Helper function to calculate percentage change ---
+    # Helper function to calculate percentage change
     def calculate_change(today_val, yesterday_val):
         today_val = today_val or 0
         yesterday_val = yesterday_val or 0
         if yesterday_val == 0:
-            return 100.0 if today_val > 0 else 0.0 # Assign 100% increase if yesterday was 0
+            return 100.0 if today_val > 0 else 0.0
         return ((today_val - yesterday_val) / yesterday_val) * 100
 
-    # Calculate changes
-    calories_change = calculate_change(today_stats.calories, yesterday_stats.calories)
-    time_change = calculate_change(today_stats.duration, yesterday_stats.duration)
+    # Calculate changes using the correct '.calories' and '.duration' attributes
+    calories_change = calculate_change(today_stats.calories if today_stats else 0, yesterday_stats.calories if yesterday_stats else 0)
+    time_change = calculate_change(today_stats.duration if today_stats else 0, yesterday_stats.duration if yesterday_stats else 0)
 
     # ... (Level progress calculation remains the same) ...
     total_lifetime_calories = lifetime_stats.total_calories_burned or 0
@@ -93,10 +92,10 @@ async def get_dashboard_overview(
         points_for_next_level=points_for_next_level
     )
 
-    # --- Construct the final response ---
+    # --- Construct the final response using the correct '.calories' attribute ---
     return schemas.DashboardOverviewStats(
-        total_calories_burned=int(today_stats.today_calories or 0),
-        total_workout_time_hours=round((today_stats.today_duration or 0) / 60, 1),
+        total_calories_burned=int(today_stats.calories or 0) if today_stats else 0,
+        total_workout_time_hours=round((today_stats.duration or 0) / 60, 1) if today_stats else 0,
         workouts_completed=lifetime_stats.workouts_completed or 0,
         level_progress=level_progress_data,
         calories_change_percent=calories_change,
