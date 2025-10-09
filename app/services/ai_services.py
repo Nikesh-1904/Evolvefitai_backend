@@ -10,7 +10,7 @@ import time
 import asyncio
 from typing import Dict, List, Any, Optional
 from app.core.config import settings
-from app import models, schemas  # Make sure schemas is imported
+from app import models, schemas  # Make sure schemas is imported and deployed
 
 # Set up logging
 logger = logging.getLogger(__name__)
