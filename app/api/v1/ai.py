@@ -397,9 +397,9 @@ async def generate_workout_plan(
 
         workout_plan = models.WorkoutPlan(
             user_id=current_user.id,
-            name=workout_data["name"],
+            name=workout_data.get("name", "AI Generated Workout"), # Safe access with a default title
             description=workout_data.get("description", "AI-generated workout plan"),
-            exercises=workout_data["exercises"],
+            exercises=workout_data.get("exercises", []), # Safe access with a default empty list
             difficulty=workout_data.get("difficulty_level", getattr(current_user, 'experience_level', 'intermediate')),
             estimated_duration=workout_data.get("estimated_duration", request.duration_minutes),
             ai_generated=workout_data.get("ai_generated", False),
