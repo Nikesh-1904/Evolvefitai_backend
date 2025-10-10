@@ -88,7 +88,17 @@ async def get_workout_logs(
         .order_by(models.WorkoutLog.workout_date.desc())
         .limit(limit)
     )
-    return result.scalars().all()
+    logs = result.scalars().all()
+
+    # Loop through the logs to fix any old data that is missing the exercise_type
+    for log in logs:
+        if log.exercises_completed:
+            for exercise in log.exercises_completed:
+                if "exercise_type" not in exercise:
+                    # If the type is missing, it's old data. Default it.
+                    exercise["exercise_type"] = "WEIGHT_BASED"
+    
+    return logs
 
 # --- UPDATED ENDPOINT ---
 @router.post("/logs", response_model=schemas.WorkoutLog)
