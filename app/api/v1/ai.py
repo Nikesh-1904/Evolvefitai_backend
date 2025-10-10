@@ -506,7 +506,8 @@ async def search_exercises(
                         "instructions": exercise.instructions,
                         "muscle_groups": exercise.muscle_groups,
                         "equipment": getattr(exercise, 'equipment', 'varies'),
-                        "difficulty": exercise.difficulty
+                        "difficulty": exercise.difficulty,
+                        "exercise_type": exercise.exercise_type
                     },
                     "videos": [{"title": v.title, "youtube_url": v.youtube_url, "duration": v.duration, "thumbnail_url": v.thumbnail_url} for v in videos],
                     "tips": [{"title": t.title, "content": t.content, "tip_type": t.tip_type} for t in tips]
