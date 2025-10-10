@@ -3,13 +3,12 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import List
+from typing import List, Optional
 from datetime import datetime
 
 from app.core.database import get_async_session
 from app.core.auth import current_active_user
 from app import models, schemas
-from app.services.ai_services import ai_workout_generator
 from app.schemas import ExerciseType # 👈 Make sure ExerciseType is imported
 
 
@@ -24,7 +23,7 @@ async def get_user_workout_plans(
     result = await session.execute(
         select(models.WorkoutPlan)
         .where(models.WorkoutPlan.user_id == current_user.id)
-        .where(models.WorkoutPlan.is_active == True)
+        .where(models.WorkoutPlan.is_active )
         .order_by(models.WorkoutPlan.created_at.desc())
     )
     return result.scalars().all()
@@ -100,7 +99,7 @@ async def log_workout(
 ):
     """Log a completed workout and calculate calories burned using per-exercise MET values."""
     
-    total_calories_burned = 0
+    total_calories_burned: float = 0.0
     user_weight_kg = getattr(current_user, 'weight', 70.0) or 70.0 # Default to 70kg if no weight
     DEFAULT_MET_VALUE = 3.5
     
@@ -118,8 +117,8 @@ async def log_workout(
         # 2. Estimate the duration of the exercise based on its type.
         if exercise_log.exercise_type in [ExerciseType.DURATION, ExerciseType.DISTANCE_DURATION, ExerciseType.QUALITATIVE]:
             # For these types, duration is logged directly.
-            exercise_duration_seconds = sum(s.duration_seconds for s in exercise_log.sets if s.duration_seconds)
-        
+            exercise_duration_seconds = sum(s.duration_seconds for s in exercise_log.sets if hasattr(s, 'duration_seconds') and s.duration_seconds)
+                  
         elif exercise_log.exercise_type in [ExerciseType.WEIGHT_BASED, ExerciseType.REPS_ONLY]:
             # For strength/reps, we estimate duration. A reasonable estimate is ~60 seconds per set (work + rest).
             num_sets = len(exercise_log.sets)
@@ -148,7 +147,7 @@ async def log_workout(
 
 @router.get("/exercises", response_model=List[schemas.Exercise])
 async def get_exercises(
-    category: str = None,
+    exercise_type: Optional[str] = None,  # Use exercise_type and Optional
     skip: int = 0,
     limit: int = 100,
     session: AsyncSession = Depends(get_async_session)
@@ -156,8 +155,8 @@ async def get_exercises(
     """Get exercises, optionally filtered by category"""
     query = select(models.Exercise)
     
-    if category:
-        query = query.where(models.Exercise.category == category)
+    if exercise_type:
+        query = query.where(models.Exercise.exercise_type == exercise_type)
     
     query = query.offset(skip).limit(limit)
     result = await session.execute(query)
@@ -169,7 +168,7 @@ async def create_exercise(
     session: AsyncSession = Depends(get_async_session)
 ):
     """Create a new exercise"""
-    db_exercise = models.Exercise(**exercise.dict())
+    db_exercise = models.Exercise(**exercise.model_dump())
     session.add(db_exercise)
     await session.commit()
     await session.refresh(db_exercise)

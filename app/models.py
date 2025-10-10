@@ -1,174 +1,181 @@
-from fastapi_users.db import SQLAlchemyBaseUserTableUUID, SQLAlchemyBaseOAuthAccountTableUUID
-from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, Float, ForeignKey, JSON
-from sqlalchemy.orm import relationship, Mapped
-from sqlalchemy.sql import func
-from sqlalchemy.dialects.postgresql import UUID
+# app/models.py
+
 import uuid
 from typing import List
+from datetime import datetime
+
+from sqlalchemy import (
+    Integer,
+    String,
+    Text,
+    Boolean,
+    DateTime,
+    Float,
+    ForeignKey,
+    JSON,
+)
+from sqlalchemy.orm import relationship, Mapped, mapped_column
+from sqlalchemy.sql import func
+from sqlalchemy.dialects.postgresql import UUID as pgUUID
 
 from app.core.database import Base
+from fastapi_users.db import (
+    SQLAlchemyBaseUserTableUUID,
+    SQLAlchemyBaseOAuthAccountTableUUID,
+)
 
-# --- The User model is now defined BEFORE the OAuthAccount model ---
+
 class User(SQLAlchemyBaseUserTableUUID, Base):
     """User model with FastAPI Users integration"""
     __tablename__ = "users"
     
-    # FastAPI Users provides: id (UUID), email, hashed_password, is_active, is_superuser, is_verified
+    username: Mapped[str] = mapped_column(String, unique=True, index=True, nullable=True)
+    full_name: Mapped[str] = mapped_column(String, nullable=True)
+    age: Mapped[int] = mapped_column(Integer, nullable=True)
+    weight: Mapped[float] = mapped_column(Float, nullable=True)
+    height: Mapped[float] = mapped_column(Float, nullable=True)
+    gender: Mapped[str] = mapped_column(String, nullable=True)
+    fitness_goal: Mapped[str] = mapped_column(String, nullable=True)
+    experience_level: Mapped[str] = mapped_column(String, nullable=True)
+    activity_level: Mapped[str] = mapped_column(String, nullable=True)
+    dietary_restrictions: Mapped[list] = mapped_column(JSON, default=list)
+    has_completed_onboarding: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), onupdate=func.now(), nullable=True)
     
-    # Additional profile fields
-    username = Column(String, unique=True, index=True)
-    full_name = Column(String)
-    
-    # Fitness profile
-    age = Column(Integer)
-    weight = Column(Float)  # kg
-    height = Column(Float)  # cm
-    gender = Column(String)
-    fitness_goal = Column(String)
-    experience_level = Column(String)
-    activity_level = Column(String)
-    
-    # Preferences
-    dietary_restrictions = Column(JSON, default=[])
-    has_completed_onboarding = Column(Boolean, default=False, nullable=False)
-    
-    # Timestamps
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    
-    # This relationship links the User to the OAuthAccount model below
-    oauth_accounts: Mapped[List["OAuthAccount"]] = relationship(lazy="joined")
-    
-    # Relationships to your other tables
-    workout_logs = relationship("WorkoutLog", back_populates="user")
-    workout_plans = relationship("WorkoutPlan", back_populates="user")
-    meal_plans = relationship("MealPlan", back_populates="user")
-    tip_interactions = relationship("TipInteraction", back_populates="user")
-    video_preferences = relationship("VideoPreference", back_populates="user")
+    oauth_accounts: Mapped[List["OAuthAccount"]] = relationship(back_populates="user", lazy="joined")
+    workout_logs: Mapped[List["WorkoutLog"]] = relationship(back_populates="user")
+    workout_plans: Mapped[List["WorkoutPlan"]] = relationship(back_populates="user")
+    meal_plans: Mapped[List["MealPlan"]] = relationship(back_populates="user")
+    tip_interactions: Mapped[List["TipInteraction"]] = relationship(back_populates="user")
+    video_preferences: Mapped[List["VideoPreference"]] = relationship(back_populates="user")
 
-# --- This model now comes AFTER the User model ---
+
 class OAuthAccount(SQLAlchemyBaseOAuthAccountTableUUID, Base):
-    # --- THIS IS THE FIX ---
-    # We explicitly define user_id to override the default from the mixin
-    # and point it to the correct "users" table.
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    user_id: uuid.UUID = mapped_column(pgUUID(as_uuid=True), ForeignKey("users.id", ondelete="cascade"), nullable=False)
+    user: Mapped["User"] = relationship(back_populates="oauth_accounts")
 
 
-# ... (The rest of your models file remains exactly the same) ...
 class Exercise(Base):
     __tablename__ = "exercises"
     
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, nullable=False, index=True)
-    exercise_type = Column(String, default='WEIGHT_BASED', nullable=False) # 🛑 REMOVE: category = Column(String)
-    muscle_groups = Column(JSON, default=list)
-    equipment = Column(String)
-    difficulty = Column(String)
-    instructions = Column(Text)
-    met_value = Column(Float, nullable=True) # 👈 ADD THIS LINE
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    name: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    exercise_type: Mapped[str] = mapped_column(String, default='WEIGHT_BASED', nullable=False)
+    muscle_groups: Mapped[List[str]] = mapped_column(JSON, default=list)
+    equipment: Mapped[str] = mapped_column(String, nullable=True)
+    difficulty: Mapped[str] = mapped_column(String, nullable=True)
+    instructions: Mapped[str] = mapped_column(Text, nullable=True)
+    met_value: Mapped[float] = mapped_column(Float, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     
-    videos = relationship("ExerciseVideo", back_populates="exercise")
-    tips = relationship("ExerciseTip", back_populates="exercise")
+    videos: Mapped[List["ExerciseVideo"]] = relationship(back_populates="exercise")
+    tips: Mapped[List["ExerciseTip"]] = relationship(back_populates="exercise")
+
 
 class ExerciseVideo(Base):
     __tablename__ = "exercise_videos"
     
-    id = Column(Integer, primary_key=True, index=True)
-    exercise_id = Column(Integer, ForeignKey("exercises.id"))
-    youtube_url = Column(String, nullable=False)
-    title = Column(String)
-    thumbnail_url = Column(String)
-    duration = Column(Integer)
-    popularity_score = Column(Float, default=0.0)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    exercise_id: Mapped[int] = mapped_column(Integer, ForeignKey("exercises.id"))
+    youtube_url: Mapped[str] = mapped_column(String, nullable=False)
+    title: Mapped[str] = mapped_column(String, nullable=True)
+    thumbnail_url: Mapped[str] = mapped_column(String, nullable=True)
+    duration: Mapped[int] = mapped_column(Integer, nullable=True)
+    popularity_score: Mapped[float] = mapped_column(Float, default=0.0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     
-    exercise = relationship("Exercise", back_populates="videos")
-    preferences = relationship("VideoPreference", back_populates="video")
+    exercise: Mapped["Exercise"] = relationship(back_populates="videos")
+    preferences: Mapped[List["VideoPreference"]] = relationship(back_populates="video")
+
 
 class WorkoutPlan(Base):
     __tablename__ = "workout_plans"
     
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"))
-    name = Column(String, nullable=False)
-    description = Column(Text)
-    exercises = Column(JSON, default=list)
-    difficulty = Column(String)
-    estimated_duration = Column(Integer)
-    ai_generated = Column(Boolean, default=False)
-    ai_model = Column(String)
-    is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(pgUUID(as_uuid=True), ForeignKey("users.id"))
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    description: Mapped[str] = mapped_column(Text, nullable=True)
+    exercises: Mapped[list] = mapped_column(JSON, default=list)
+    difficulty: Mapped[str] = mapped_column(String, nullable=True)
+    estimated_duration: Mapped[int] = mapped_column(Integer, nullable=True)
+    ai_generated: Mapped[bool] = mapped_column(Boolean, default=False)
+    ai_model: Mapped[str] = mapped_column(String, nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     
-    user = relationship("User", back_populates="workout_plans")
+    user: Mapped["User"] = relationship(back_populates="workout_plans")
+
 
 class WorkoutLog(Base):
     __tablename__ = "workout_logs"
     
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"))
-    workout_plan_id = Column(Integer, ForeignKey("workout_plans.id"), nullable=True)
-    exercises_completed = Column(JSON, default=list)
-    duration_minutes = Column(Integer)
-    calories_burned = Column(Float, nullable=True) # 👈 ADD THIS LINE
-    notes = Column(Text)
-    workout_date = Column(DateTime(timezone=True), server_default=func.now())
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(pgUUID(as_uuid=True), ForeignKey("users.id"))
+    workout_plan_id: Mapped[int] = mapped_column(Integer, ForeignKey("workout_plans.id"), nullable=True)
+    exercises_completed: Mapped[list] = mapped_column(JSON, default=list)
+    duration_minutes: Mapped[int] = mapped_column(Integer, nullable=True)
+    calories_burned: Mapped[float] = mapped_column(Float, nullable=True)
+    notes: Mapped[str] = mapped_column(Text, nullable=True)
+    workout_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     
-    user = relationship("User", back_populates="workout_logs")
+    user: Mapped["User"] = relationship(back_populates="workout_logs")
+
 
 class MealPlan(Base):
     __tablename__ = "meal_plans"
     
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"))
-    name = Column(String, nullable=False)
-    target_calories = Column(Integer)
-    target_protein = Column(Float)
-    target_carbs = Column(Float)
-    target_fat = Column(Float)
-    meals = Column(JSON, default=dict)
-    ai_generated = Column(Boolean, default=False)
-    ai_model = Column(String)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(pgUUID(as_uuid=True), ForeignKey("users.id"))
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    target_calories: Mapped[int] = mapped_column(Integer, nullable=True)
+    target_protein: Mapped[float] = mapped_column(Float, nullable=True)
+    target_carbs: Mapped[float] = mapped_column(Float, nullable=True)
+    target_fat: Mapped[float] = mapped_column(Float, nullable=True)
+    meals: Mapped[dict] = mapped_column(JSON, default=dict)
+    ai_generated: Mapped[bool] = mapped_column(Boolean, default=False)
+    ai_model: Mapped[str] = mapped_column(String, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     
-    user = relationship("User", back_populates="meal_plans")
+    user: Mapped["User"] = relationship(back_populates="meal_plans")
+
 
 class ExerciseTip(Base):
     __tablename__ = "exercise_tips"
     
-    id = Column(Integer, primary_key=True, index=True)
-    exercise_id = Column(Integer, ForeignKey("exercises.id"))
-    title = Column(String, nullable=False)
-    content = Column(Text, nullable=False)
-    tip_type = Column(String)
-    popularity_score = Column(Float, default=0.0)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    exercise_id: Mapped[int] = mapped_column(Integer, ForeignKey("exercises.id"))
+    title: Mapped[str] = mapped_column(String, nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    tip_type: Mapped[str] = mapped_column(String, nullable=True)
+    popularity_score: Mapped[float] = mapped_column(Float, default=0.0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     
-    exercise = relationship("Exercise", back_populates="tips")
-    interactions = relationship("TipInteraction", back_populates="tip")
+    exercise: Mapped["Exercise"] = relationship(back_populates="tips")
+    interactions: Mapped[List["TipInteraction"]] = relationship(back_populates="tip")
+
 
 class TipInteraction(Base):
     __tablename__ = "tip_interactions"
     
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"))
-    tip_id = Column(Integer, ForeignKey("exercise_tips.id"))
-    interaction_type = Column(String)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(pgUUID(as_uuid=True), ForeignKey("users.id"))
+    tip_id: Mapped[int] = mapped_column(Integer, ForeignKey("exercise_tips.id"))
+    interaction_type: Mapped[str] = mapped_column(String, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     
-    user = relationship("User", back_populates="tip_interactions")
-    tip = relationship("ExerciseTip", back_populates="interactions")
+    user: Mapped["User"] = relationship(back_populates="tip_interactions")
+    tip: Mapped["ExerciseTip"] = relationship(back_populates="interactions")
+
 
 class VideoPreference(Base):
     __tablename__ = "video_preferences"
     
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"))
-    video_id = Column(Integer, ForeignKey("exercise_videos.id"))
-    preference = Column(String)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(pgUUID(as_uuid=True), ForeignKey("users.id"))
+    video_id: Mapped[int] = mapped_column(Integer, ForeignKey("exercise_videos.id"))
+    preference: Mapped[str] = mapped_column(String, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     
-    user = relationship("User", back_populates="video_preferences")
-    video = relationship("ExerciseVideo", back_populates="preferences")
-
+    user: Mapped["User"] = relationship(back_populates="video_preferences")
+    video: Mapped["ExerciseVideo"] = relationship(back_populates="preferences")

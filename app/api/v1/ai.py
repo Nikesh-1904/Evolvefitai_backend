@@ -7,7 +7,6 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional, Dict
 from datetime import datetime
-import uuid
 
 from app.core.database import get_async_session
 from app.core.auth import current_active_user
@@ -287,7 +286,7 @@ async def generate_workout_plan(
     logger.info(f"🕒 Request Time: {datetime.now().isoformat()}")
     logger.info(f"⏱️  Duration: {request.duration_minutes} minutes")
     logger.info(f"💪 Targeting: {', '.join(request.target_muscle_groups)}" if request.target_muscle_groups else "💪 Targeting: Not specified")
-    logger.info(f"👤 User Profile Summary:")
+    logger.info("👤 User Profile Summary:")
     logger.info(f"   - Age: {getattr(current_user, 'age', 'Not set')}")
     logger.info(f"   - Weight: {getattr(current_user, 'weight', 'Not set')}kg") 
     logger.info(f"   - Height: {getattr(current_user, 'height', 'Not set')}cm")
@@ -308,7 +307,7 @@ async def generate_workout_plan(
         # 👇 Pass the new filters to the AI service
         workout_data = await ai_workout_generator.generate_workout(
             user=current_user,
-            duration_minutes=request.duration_minutes,
+            duration_minutes=request.duration_minutes or 45,
             target_muscles=request.target_muscle_groups,
             num_exercises=request.num_exercises,
             workout_type=request.workout_type
@@ -317,7 +316,7 @@ async def generate_workout_plan(
         generation_time = (datetime.now() - start_time).total_seconds()
 
         logger.info("📊 GENERATION RESULTS:")
-        logger.info(f"✅ Success: True")
+        logger.info("✅ Success: True")
         logger.info(f"⏱️  Total Time: {generation_time:.2f} seconds")
         logger.info(f"🤖 AI Generated: {workout_data.get('ai_generated', 'Unknown')}")
         logger.info(f"🎯 AI Model: {workout_data.get('ai_model', 'Unknown')}")
@@ -433,7 +432,7 @@ async def generate_workout_plan(
         logger.error(f"🕒 Error Time: {error_time:.2f}s after start")
         logger.error(f"🔴 Error Type: {type(e).__name__}")
         logger.error(f"📝 Error Message: {str(e)}")
-        logger.error(f"📚 Stack Trace:", exc_info=True)
+        logger.error("📚 Stack Trace:", exc_info=True)
         logger.error("=" * 100)
         raise HTTPException(status_code=500, detail=f"Workout generation failed: {str(e)}")
 
@@ -466,7 +465,7 @@ async def generate_meal_plan(
         generation_time = (datetime.now() - start_time).total_seconds()
 
         logger.info("📊 MEAL PLAN GENERATION RESULTS:")
-        logger.info(f"✅ Success: True")
+        logger.info("✅ Success: True")
         logger.info(f"⏱️  Total Time: {generation_time:.2f} seconds")
         logger.info(f"🤖 AI Generated: {meal_plan_data.get('ai_generated', False)}")
         logger.info(f"🎯 AI Model: {meal_plan_data.get('ai_model', 'Unknown')}")
@@ -505,7 +504,7 @@ async def generate_meal_plan(
         logger.error(f"🕒 Error Time: {error_time:.2f}s after start")
         logger.error(f"🔴 Error Type: {type(e).__name__}")
         logger.error(f"📝 Error Message: {str(e)}")
-        logger.error(f"📚 Stack Trace:", exc_info=True)
+        logger.error("📚 Stack Trace:", exc_info=True)
         logger.error("=" * 80)
         raise HTTPException(
             status_code=500, 

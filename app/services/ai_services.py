@@ -3,12 +3,10 @@
 import json
 import requests
 import random
-import numpy as np
 import logging
-import re
 import time
 import asyncio
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Optional
 from app.core.config import settings
 from app import models, schemas  # Make sure schemas is imported and deployed
 
@@ -334,7 +332,7 @@ class RuleBasedWorkoutGenerator:
         workout_names = {
             "strength": f"Power {level.capitalize()} Strength",
             "cardio": f"High-Energy {level.capitalize()} Cardio",
-            "muscle_gain": f"Smart Muscle Gain Workout"
+            "muscle_gain": "Smart Muscle Gain Workout"
         }
         workout_name = workout_names.get(goal, f"{level.capitalize()} Workout")
 
@@ -728,9 +726,12 @@ Now, generate the complete JSON object for the user's request.
     ) -> Dict:
         # ... (logging code remains the same)
         logger.info(f"🎯 Goal: {goal} | Level: {level} | Duration: {duration}min")
-        if num_exercises: logger.info(f"🔢 Exercises: {num_exercises}")
-        if workout_type: logger.info(f"🏡 Type: {workout_type}")
-        if target_muscles: logger.info(f"💪 Targeting: {', '.join(target_muscles)}")
+        if num_exercises: 
+            logger.info(f"🔢 Exercises: {num_exercises}")
+        if workout_type: 
+            logger.info(f"🏡 Type: {workout_type}")
+        if target_muscles: 
+            logger.info(f"💪 Targeting: {', '.join(target_muscles)}")
         logger.info("=" * 80)
 
         prompt = self.create_ai_prompt(goal, level, duration, num_exercises, workout_type, target_muscles)
@@ -742,7 +743,7 @@ Now, generate the complete JSON object for the user's request.
             if raw_response:
                 workout_data = self.groq_ai.safe_json_extract(raw_response)
                 if workout_data and "exercises" in workout_data:
-                    logger.info(f"✅ SUCCESS: Groq AI generated workout")
+                    logger.info("✅ SUCCESS: Groq AI generated workout")
                     workout_data.update({"ai_generated": True, "ai_model": f"Groq AI ({self.groq_ai.available_models[self.groq_ai.current_model_index]})"})
                     return workout_data
                 else:
@@ -798,7 +799,7 @@ Now, generate the complete JSON object for the user's request.
         # Final fallback: Rule-based system
         logger.warning("⚠️ All AI models failed, using fallback...")
         workout_data = self.rule_based.generate_workout(goal, level, duration)
-        logger.info(f"✅ SUCCESS: Rule-based system generated workout")
+        logger.info("✅ SUCCESS: Rule-based system generated workout")
         return workout_data
 
     async def generate_workout(
