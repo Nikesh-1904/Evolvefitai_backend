@@ -60,7 +60,7 @@ class Exercise(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, nullable=False, index=True)
-    category = Column(String)
+    exercise_type = Column(String, default='WEIGHT_BASED', nullable=False) # 🛑 REMOVE: category = Column(String)
     muscle_groups = Column(JSON, default=list)
     equipment = Column(String)
     difficulty = Column(String)

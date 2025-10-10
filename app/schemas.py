@@ -1,19 +1,57 @@
 # app/schemas.py
 
 from pydantic import BaseModel, EmailStr, validator
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Union
 from datetime import datetime,date
 import uuid
 from fastapi_users import schemas
+from enum import Enum
 
 # --- NEW Schemas for Workout Logging ---
-class LoggedSet(BaseModel):
+# --- START OF NEW/UPDATED LOGGING SCHEMAS ---
+
+# 1. Define our exercise types using an Enum for type safety
+class ExerciseType(str, Enum):
+    WEIGHT_BASED = "WEIGHT_BASED"
+    REPS_ONLY = "REPS_ONLY"
+    DURATION = "DURATION"
+    DISTANCE_DURATION = "DISTANCE_DURATION"
+    QUALITATIVE = "QUALITATIVE"
+
+# 2. Define a schema for each type of logged data point ("set")
+class LoggedSetWeightBased(BaseModel):
     reps: int
     weight: float
 
+class LoggedSetRepsOnly(BaseModel):
+    reps: int
+
+class LoggedSetDuration(BaseModel):
+    duration_seconds: int
+
+class LoggedSetDistanceDuration(BaseModel):
+    duration_seconds: int
+    distance_km: float
+
+class LoggedSetQualitative(BaseModel):
+    duration_seconds: Optional[int] = None
+    notes: Optional[str] = None
+
+# 3. Create a Union type that can be any of the above schemas
+AnyLoggedSet = Union[
+    LoggedSetWeightBased,
+    LoggedSetRepsOnly,
+    LoggedSetDuration,
+    LoggedSetDistanceDuration,
+    LoggedSetQualitative,
+]
+
+# 4. Update LoggedExercise to use the new Union type and require the exercise_type
 class LoggedExercise(BaseModel):
     name: str
-    sets: List[LoggedSet]
+    exercise_type: ExerciseType # We need this to know how to interpret the sets data
+    sets: List[AnyLoggedSet]
+
 
 # User schemas
 class UserRead(schemas.BaseUser[uuid.UUID]):
@@ -65,7 +103,7 @@ class UserUpdate(schemas.BaseUserUpdate):
 # Exercise schemas
 class ExerciseBase(BaseModel):
     name: str
-    category: Optional[str] = None
+    exercise_type: Optional[ExerciseType] = ExerciseType.WEIGHT_BASED # 👈 UPDATE THIS
     muscle_groups: Optional[List[str]] = []
     equipment: Optional[str] = None
     difficulty: Optional[str] = None
