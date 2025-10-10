@@ -14,6 +14,7 @@ from app.core.auth import current_active_user
 from app.core.config import settings
 from app import models, schemas
 from app.services.ai_services import ai_workout_generator
+from app.schemas import ExerciseType # 👈 Make sure ExerciseType is imported
 
 # Set up logging for this module
 logger = logging.getLogger(__name__)
@@ -173,6 +174,47 @@ EXERCISE_DATABASE = {
     }
 }
 
+def apply_exercise_type_overrides(workout_data: dict) -> dict:
+    """Scans exercise names and corrects the exercise_type based on keywords."""
+    if not workout_data.get("exercises"):
+        return workout_data
+
+    # Define simple rules. This can be expanded over time.
+    keyword_map = {
+        'plank': ExerciseType.DURATION,
+        'stretch': ExerciseType.QUALITATIVE,
+        'yoga': ExerciseType.QUALITATIVE,
+        'burpee': ExerciseType.REPS_ONLY,
+        'push-up': ExerciseType.REPS_ONLY,
+        'pushup': ExerciseType.REPS_ONLY,
+        'crunch': ExerciseType.REPS_ONLY,
+        'sit-up': ExerciseType.REPS_ONLY,
+        'running': ExerciseType.DISTANCE_DURATION,
+        'run': ExerciseType.DISTANCE_DURATION,
+        'jog': ExerciseType.DISTANCE_DURATION,
+        'cycling': ExerciseType.DISTANCE_DURATION,
+        'bike': ExerciseType.DISTANCE_DURATION,
+        'jumping jack': ExerciseType.REPS_ONLY,
+        'squat jump': ExerciseType.REPS_ONLY,
+    }
+
+    for exercise in workout_data["exercises"]:
+        exercise_name_lower = exercise.get("name", "").lower()
+        
+        # Make sure a default type is always present
+        if "exercise_type" not in exercise:
+            exercise["exercise_type"] = ExerciseType.WEIGHT_BASED
+
+        # Apply overrides
+        for keyword, ex_type in keyword_map.items():
+            if keyword in exercise_name_lower:
+                if exercise["exercise_type"] != ex_type:
+                    logger.info(f"Overriding exercise type for '{exercise['name']}' to {ex_type.value}")
+                    exercise["exercise_type"] = ex_type
+                break # Stop after first match
+
+    return workout_data
+
 async def search_youtube_videos(query: str, max_results: int = 3) -> List[Dict]:
     """Search YouTube for exercise videos"""
     if not settings.YOUTUBE_API_KEY:
@@ -283,6 +325,8 @@ async def generate_workout_plan(
         logger.info(f"🏋️  Exercise Count: {len(workout_data.get('exercises', []))}")
         logger.info(f"🔥 Estimated Calories: {workout_data.get('estimated_calories', 'Not calculated')}")
         logger.info(f"📈 Difficulty: {workout_data.get('difficulty_level', 'Not specified')}")
+
+        workout_data = apply_exercise_type_overrides(workout_data)
 
         # --- NEW Self-populating Exercise Database Logic ---
         if workout_data.get("ai_generated") and workout_data.get("exercises"):

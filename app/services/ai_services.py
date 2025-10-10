@@ -604,54 +604,89 @@ class AIWorkoutService:
         target_muscles: Optional[List[str]] = None
     ) -> str:
         
-        # --- START: NEW PROMPT LOGIC ---
+        # --- NEW HIGH-DETAIL PROMPT ---
 
-        # Prioritize the explicit workout_type over the user's default goal if specified.
-        if workout_type:
-            prompt = f"Generate a {duration}-minute '{workout_type}' workout (e.g., 'at-home bodyweight', 'gym dumbbell workout', 'yoga flow')."
-            # Only add the user's goal if it's not a conflicting type like Yoga or Cardio
-            if workout_type.lower() not in ['yoga', 'cardio', 'hiit']:
-                 prompt += f" The user's secondary goal is '{goal}'."
-        else:
-            # If no specific type, build the prompt around the user's primary goal.
-            prompt = f"Generate a {duration}-minute workout for a user whose primary goal is '{goal}'."
+        prompt = f"""
+You are an expert fitness coach and workout designer named 'Evolve AI'. Your task is to generate a personalized workout plan based on the user's profile and requests. You must adhere strictly to the JSON output format specified.
 
-        prompt += f" The user's fitness level is '{level}'."
+**User Profile:**
+- **Primary Goal:** {goal}
+- **Fitness Level:** {level}
 
-        # Add other filters
-        if target_muscles:
-            muscle_list = ", ".join(target_muscles)
-            prompt += f" The workout MUST primarily focus on these muscle groups: {muscle_list}."
+**Workout Request:**
+- **Total Duration:** {duration} minutes
+- **Specific Workout Type:** {workout_type or 'Not specified, use best judgment'}
+- **Target Muscle Groups:** {', '.join(target_muscles) if target_muscles else 'Not specified'}
+- **Number of Exercises:** {num_exercises or 'You decide the optimal number'}
 
-        if num_exercises:
-            prompt += f" The workout MUST contain exactly {num_exercises} exercises."
+**Core Instructions:**
+1.  **Create a motivating and descriptive name** for the workout.
+2.  **For EACH exercise, you MUST provide the following keys:**
+    - `name`: The common name of the exercise.
+    - `sets`: The number of sets.
+    - `reps`: The number of repetitions or duration for a set.
+    - `instructions`: Clear, concise instructions on how to perform the exercise.
+    - `muscle_groups`: A list of the primary muscles targeted.
+    - `met_value`: Your best estimate of the MET (Metabolic Equivalent of Task) value for this exercise.
+    - `exercise_type`: This is CRITICAL. You must classify the exercise into one of the following exact categories based on how it is logged:
+        - `WEIGHT_BASED`: For exercises where the user logs both weight and reps (e.g., Bench Press, Dumbbell Curls).
+        - `REPS_ONLY`: For bodyweight exercises where only reps are logged (e.g., Push-ups, Burpees, Crunches).
+        - `DURATION`: For exercises held for time (e.g., Plank, Wall Sit).
+        - `DISTANCE_DURATION`: For cardio where distance and time are logged (e.g., Running, Cycling).
+        - `QUALITATIVE`: For activities like yoga or stretching where the user logs completion and notes.
 
-        # Add the formatting requirements at the end, including the keyword "json"
-        prompt += """
+**Output Format:**
+- You must respond ONLY with a single, valid JSON object.
+- Do not include any introductory text, explanations, or markdown formatting like ```json.
 
-Requirements:
-- Provide a creative and motivating name for the workout.
-- For EACH exercise, provide: name, sets, reps, detailed instructions, a list of primary muscle_groups, and an estimated met_value.
-- Respond ONLY with a valid JSON object. Do not include any other text.
+**Example Scenarios:**
 
-Example JSON format:
-{
-  "name": "Zenith Yoga Flow",
-  "description": "A flowing yoga sequence to build strength and flexibility.",
-  "difficulty_level": "intermediate",
-  "estimated_duration": 45,
-  "exercises": [
-    {
-      "name": "Sun Salutation A",
-      "sets": 5,
-      "reps": "1 flow",
-      "instructions": "Flow through chaturanga, upward-facing dog, and downward-facing dog.",
-      "muscle_groups": ["full body", "core"],
-      "met_value": 4.0
+* **Example 1: A strength exercise.**
+    {{
+      "name": "Dumbbell Bench Press",
+      "sets": 3,
+      "reps": "8-12",
+      "instructions": "Lie on a flat bench with a dumbbell in each hand. Push the dumbbells up until your arms are fully extended.",
+      "muscle_groups": ["chest", "triceps", "shoulders"],
+      "met_value": 5.0,
+      "exercise_type": "WEIGHT_BASED"
+    }}
+
+* **Example 2: A bodyweight exercise.**
+    {{
+      "name": "Burpees",
+      "sets": 4,
+      "reps": "10",
+      "instructions": "Start in a standing position. Drop into a squat, kick your feet back into a plank, perform a push-up, return to the squat, and jump up explosively.",
+      "muscle_groups": ["full body", "core", "legs"],
+      "met_value": 8.0,
+      "exercise_type": "REPS_ONLY"
+    }}
+
+* **Example 3: A duration-based exercise.**
+    {{
+      "name": "Forearm Plank",
+      "sets": 3,
+      "reps": "60 seconds",
+      "instructions": "Hold a straight line from your head to your heels, resting on your forearms and toes. Keep your core engaged.",
+      "muscle_groups": ["core", "abs"],
+      "met_value": 3.0,
+      "exercise_type": "DURATION"
+    }}
+
+* **Example 4: A yoga/qualitative exercise.**
+    {{
+      "name": "Cool-down Stretching",
+      "sets": 1,
+      "reps": "5 minutes",
+      "instructions": "Perform a series of static stretches, holding each for 30 seconds. Focus on the muscles worked during the session.",
+      "muscle_groups": ["full body"],
+      "met_value": 2.5,
       "exercise_type": "QUALITATIVE"
-    }
-  ]
-}"""
+    }}
+
+Now, generate the complete JSON object for the user's request.
+"""
         return prompt
 
     def generate_workout_sync(
