@@ -52,7 +52,7 @@ class User(SQLAlchemyBaseUserTableUUID, Base):
 
 
 class OAuthAccount(SQLAlchemyBaseOAuthAccountTableUUID, Base):
-    user_id: uuid.UUID = mapped_column(pgUUID(as_uuid=True), ForeignKey("users.id", ondelete="cascade"), nullable=False)
+    user_id: uuid.UUID = mapped_column(pgUUID(as_uuid=True), ForeignKey("users.id", ondelete="cascade"), nullable=False) # type: ignore
     user: Mapped["User"] = relationship(back_populates="oauth_accounts")
 
 
