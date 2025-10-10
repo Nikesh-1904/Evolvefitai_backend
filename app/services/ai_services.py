@@ -684,6 +684,34 @@ You are an expert fitness coach and workout designer named 'Evolve AI'. Your tas
       "met_value": 2.5,
       "exercise_type": "QUALITATIVE"
     }}
+    
+**Complete Example of Expected Output:**
+{{
+  "name": "Full Body Ignition",
+  "description": "A 45-minute workout to build strength and endurance across all major muscle groups.",
+  "difficulty_level": "intermediate",
+  "estimated_duration": 45,
+  "exercises": [
+    {{
+      "name": "Dumbbell Bench Press",
+      "sets": 3,
+      "reps": "8-12",
+      "instructions": "Lie on a flat bench...",
+      "muscle_groups": ["chest", "triceps", "shoulders"],
+      "met_value": 5.0,
+      "exercise_type": "WEIGHT_BASED"
+    }},
+    {{
+      "name": "Burpees",
+      "sets": 4,
+      "reps": "10",
+      "instructions": "Start in a standing position...",
+      "muscle_groups": ["full body", "core", "legs"],
+      "met_value": 8.0,
+      "exercise_type": "REPS_ONLY"
+    }}
+  ]
+}}
 
 Now, generate the complete JSON object for the user's request.
 """
