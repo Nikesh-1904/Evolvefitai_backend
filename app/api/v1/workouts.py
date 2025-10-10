@@ -76,6 +76,21 @@ async def create_workout_plan(
     await session.refresh(db_plan)
     return db_plan
 
+@router.get("/logs", response_model=List[schemas.WorkoutLog])
+async def get_workout_logs(
+    limit: int = 20,
+    current_user: models.User = Depends(current_active_user),
+    session: AsyncSession = Depends(get_async_session)
+):
+    """Get workout logs for the current user."""
+    result = await session.execute(
+        select(models.WorkoutLog)
+        .where(models.WorkoutLog.user_id == current_user.id)
+        .order_by(models.WorkoutLog.workout_date.desc())
+        .limit(limit)
+    )
+    return result.scalars().all()
+
 # --- UPDATED ENDPOINT ---
 @router.post("/logs", response_model=schemas.WorkoutLog)
 async def log_workout(
