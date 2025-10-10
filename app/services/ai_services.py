@@ -648,6 +648,7 @@ Example JSON format:
       "instructions": "Flow through chaturanga, upward-facing dog, and downward-facing dog.",
       "muscle_groups": ["full body", "core"],
       "met_value": 4.0
+      "exercise_type": "QUALITATIVE"
     }
   ]
 }"""
