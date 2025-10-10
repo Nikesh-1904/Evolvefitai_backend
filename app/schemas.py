@@ -233,8 +233,9 @@ class ExerciseSetData(BaseModel):
 
 class ExerciseProgressionDataPoint(BaseModel):
     workout_date: date
-    total_volume: float
-    sets: List[ExerciseSetData]
+    primary_metric_value: float
+    metric_type: str  # e.g., 'volume', 'reps', 'duration_seconds'
+    sets: List[Dict[str, Any]] # Keep sets flexible
 
 class ExerciseTip(ExerciseTipBase):
     id: int

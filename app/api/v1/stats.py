@@ -147,7 +147,6 @@ async def get_exercise_progression(
 ):
     """Get the historical progression for a single exercise for the current user."""
     
-    # 1. Fetch all workout logs for the user, ordered by date.
     query = (
         select(models.WorkoutLog)
         .where(models.WorkoutLog.user_id == current_user.id)
@@ -158,28 +157,39 @@ async def get_exercise_progression(
     
     progression_data = []
 
-    # 2. Process the logs in Python to find the specific exercise.
     for log in all_logs:
-        # The exercises are stored in a JSON column.
         for exercise in log.exercises_completed:
             if exercise.get("name", "").lower() == exercise_name.lower():
                 
-                # 3. Calculate total volume (sets * reps * weight) for this workout day.
-                total_volume = sum(
-                    s.get('reps', 0) * s.get('weight', 0)
-                    for s in exercise.get('sets', [])
-                )
+                ex_type = exercise.get("exercise_type")
+                sets = exercise.get("sets", [])
+                
+                primary_metric_value = 0
+                metric_type = "unknown"
 
-                # 4. Create the data point for the response.
-                data_point = schemas.ExerciseProgressionDataPoint(
-                    workout_date=log.workout_date.date(),
-                    total_volume=total_volume,
-                    sets=[schemas.ExerciseSetData(**s) for s in exercise.get('sets', [])]
-                )
-                progression_data.append(data_point)
-
-                # Found the exercise for this log, move to the next log.
-                break 
+                # Calculate the primary metric based on exercise type
+                if ex_type == "WEIGHT_BASED":
+                    metric_type = "Volume (kg)"
+                    primary_metric_value = sum(s.get("reps", 0) * s.get("weight", 0) for s in sets)
+                elif ex_type == "REPS_ONLY":
+                    metric_type = "Total Reps"
+                    primary_metric_value = sum(s.get("reps", 0) for s in sets)
+                elif ex_type == "DURATION":
+                    metric_type = "Total Duration (sec)"
+                    primary_metric_value = sum(s.get("duration_seconds", 0) for s in sets)
+                elif ex_type == "DISTANCE_DURATION":
+                    metric_type = "Total Distance (km)"
+                    primary_metric_value = sum(s.get("distance_km", 0) for s in sets)
+                
+                if metric_type != "unknown":
+                    data_point = schemas.ExerciseProgressionDataPoint(
+                        workout_date=log.workout_date.date(),
+                        primary_metric_value=primary_metric_value,
+                        metric_type=metric_type,
+                        sets=sets
+                    )
+                    progression_data.append(data_point)
+                break
                 
     return progression_data
 
