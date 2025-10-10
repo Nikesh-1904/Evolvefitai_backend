@@ -49,7 +49,7 @@ AnyLoggedSet = Union[
 # 4. Update LoggedExercise to use the new Union type and require the exercise_type
 class LoggedExercise(BaseModel):
     name: str
-    exercise_type: ExerciseType # We need this to know how to interpret the sets data
+    exercise_type: Optional[ExerciseType] = None # We need this to know how to interpret the sets data
     sets: List[AnyLoggedSet]
 
 
