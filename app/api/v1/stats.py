@@ -47,8 +47,8 @@ async def get_dashboard_overview(
     )
     today_result = await session.execute(today_query)
     today_stats = today_result.first()
-    today_calories = today_stats.calories if today_stats else 0
-    today_duration = today_stats.duration if today_stats else 0
+    today_calories = today_stats.calories or 0
+    today_duration = today_stats.duration or 0
 
 
     # --- Query for YESTERDAY'S stats (for comparison) ---
@@ -62,8 +62,8 @@ async def get_dashboard_overview(
     )
     yesterday_result = await session.execute(yesterday_query)
     yesterday_stats = yesterday_result.first()
-    yesterday_calories = yesterday_stats.calories if yesterday_stats else 0
-    yesterday_duration = yesterday_stats.duration if yesterday_stats else 0
+    yesterday_calories = yesterday_stats.calories or 0
+    yesterday_duration = yesterday_stats.duration or 0
 
 
     # Helper function to calculate percentage change
@@ -79,7 +79,7 @@ async def get_dashboard_overview(
     time_change = calculate_change(today_duration, yesterday_duration)
 
     # ... (Level progress calculation remains the same) ...
-    total_lifetime_calories = lifetime_stats.total_calories_burned if lifetime_stats else 0
+    total_lifetime_calories = lifetime_stats.total_calories_burned or 0
     points = total_lifetime_calories / 2
     level = 1
     points_for_current_level = 0
@@ -102,7 +102,7 @@ async def get_dashboard_overview(
     return schemas.DashboardOverviewStats(
         total_calories_burned=int(today_calories),
         total_workout_time_hours=round(today_duration / 60, 1),
-        workouts_completed=lifetime_stats.workouts_completed if lifetime_stats else 0,
+        workouts_completed=lifetime_stats.workouts_completed or 0,
         level_progress=level_progress_data,
         calories_change_percent=calories_change,
         time_change_percent=time_change
