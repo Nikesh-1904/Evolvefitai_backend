@@ -3,7 +3,6 @@
 import uuid
 from typing import List
 from datetime import datetime
-
 from sqlalchemy import (
     Integer,
     String,
@@ -17,7 +16,6 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship, Mapped, mapped_column
 from sqlalchemy.sql import func
 from sqlalchemy.dialects.postgresql import UUID as pgUUID
-
 from app.core.database import Base
 from fastapi_users.db import (
     SQLAlchemyBaseUserTableUUID,
@@ -31,6 +29,7 @@ class User(SQLAlchemyBaseUserTableUUID, Base):
     
     username: Mapped[str] = mapped_column(String, unique=True, index=True, nullable=True)
     full_name: Mapped[str] = mapped_column(String, nullable=True)
+    
     age: Mapped[int] = mapped_column(Integer, nullable=True)
     weight: Mapped[float] = mapped_column(Float, nullable=True)
     height: Mapped[float] = mapped_column(Float, nullable=True)
@@ -40,6 +39,11 @@ class User(SQLAlchemyBaseUserTableUUID, Base):
     activity_level: Mapped[str] = mapped_column(String, nullable=True)
     dietary_restrictions: Mapped[list] = mapped_column(JSON, default=list)
     has_completed_onboarding: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    
+    # NEW: Gym affiliation fields
+    gym_id: Mapped[int] = mapped_column(Integer, ForeignKey("gyms.id"), nullable=True, index=True)
+    last_gym_change: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
+    
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), onupdate=func.now(), nullable=True)
     
@@ -49,6 +53,10 @@ class User(SQLAlchemyBaseUserTableUUID, Base):
     meal_plans: Mapped[List["MealPlan"]] = relationship(back_populates="user")
     tip_interactions: Mapped[List["TipInteraction"]] = relationship(back_populates="user")
     video_preferences: Mapped[List["VideoPreference"]] = relationship(back_populates="user")
+    
+    # NEW: Gym relationships
+    gym: Mapped["Gym"] = relationship(back_populates="members")
+    gym_bookings: Mapped[List["GymBooking"]] = relationship(back_populates="user")
 
 
 class OAuthAccount(SQLAlchemyBaseOAuthAccountTableUUID, Base):
@@ -179,3 +187,60 @@ class VideoPreference(Base):
     
     user: Mapped["User"] = relationship(back_populates="video_preferences")
     video: Mapped["ExerciseVideo"] = relationship(back_populates="preferences")
+
+
+# ========== NEW MODELS FOR GYM AND COMMUNITY FEATURES ==========
+
+class Gym(Base):
+    """Gym model for community and booking features"""
+    __tablename__ = "gyms"
+    
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    name: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    address: Mapped[str] = mapped_column(String, nullable=False)
+    city: Mapped[str] = mapped_column(String, index=True, nullable=True)
+    state: Mapped[str] = mapped_column(String, nullable=True)
+    country: Mapped[str] = mapped_column(String, nullable=True)
+    latitude: Mapped[float] = mapped_column(Float, nullable=True)
+    longitude: Mapped[float] = mapped_column(Float, nullable=True)
+    logo_url: Mapped[str] = mapped_column(String, nullable=True)
+    
+    # Operating hours stored as JSON
+    # Format: {"monday": {"open": "06:00", "close": "22:00"}, ...}
+    operating_hours: Mapped[dict] = mapped_column(JSON, default=dict)
+    
+    # Capacity and settings
+    max_capacity: Mapped[int] = mapped_column(Integer, default=100)
+    google_place_id: Mapped[str] = mapped_column(String, unique=True, nullable=True, index=True)
+    
+    # Timestamps
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), onupdate=func.now(), nullable=True)
+    
+    # Relationships
+    members: Mapped[List["User"]] = relationship(back_populates="gym")
+    bookings: Mapped[List["GymBooking"]] = relationship(back_populates="gym")
+
+
+class GymBooking(Base):
+    """Gym booking model for slot reservations"""
+    __tablename__ = "gym_bookings"
+    
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(pgUUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    gym_id: Mapped[int] = mapped_column(Integer, ForeignKey("gyms.id"), nullable=False)
+    
+    # Booking time details
+    start_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
+    end_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    
+    # Booking status
+    status: Mapped[str] = mapped_column(String, default="active")  # active, cancelled, completed
+    
+    # Timestamps
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    cancelled_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
+    
+    # Relationships
+    user: Mapped["User"] = relationship(back_populates="gym_bookings")
+    gym: Mapped["Gym"] = relationship(back_populates="bookings")
