@@ -54,7 +54,7 @@ class User(SQLAlchemyBaseUserTableUUID, Base):
     workout_logs: Mapped[List["WorkoutLog"]] = relationship(back_populates="user")
     workout_plans: Mapped[List["WorkoutPlan"]] = relationship(back_populates="user")
     meal_plans: Mapped[List["MealPlan"]] = relationship(back_populates="user")
-    achievements: Mapped[List["UserAchievement"]] = relationship(back_populates="user")
+    achievements: Mapped[List["UserAchievement"]] = relationship(back_populates="user", lazy="joined")
     tip_interactions: Mapped[List["TipInteraction"]] = relationship(back_populates="user")
     video_preferences: Mapped[List["VideoPreference"]] = relationship(back_populates="user")
     
