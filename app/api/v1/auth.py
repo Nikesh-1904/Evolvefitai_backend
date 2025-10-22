@@ -1,7 +1,7 @@
 # app/api/v1/auth.py
 import logging
 from fastapi import APIRouter, Depends, Request, HTTPException, status
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, JSONResponse
 from fastapi_users import exceptions
 from httpx_oauth.exceptions import GetIdEmailError
 
@@ -45,21 +45,28 @@ if google_oauth_client:
 
     @router.get("/google/authorize", tags=["auth"])
     async def google_authorize(request: Request):
-        """Generate and return a redirect response to Google's authorization URL."""
+        """
+        Generate and return the authorization URL as JSON.
+        This matches the frontend's expectation in apiService.js.
+        """
         if not google_oauth_client:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST, 
                 detail="Google OAuth is not configured"
             )
-        
+
+        # We still build the correct callback URL
         redirect_url = str(request.url_for("google_callback"))
-        
+
         authorization_url = await google_oauth_client.get_authorization_url(
             redirect_url,
             scope=["openid", "email", "profile"],
         )
-        # This directly redirects the user's browser to Google.
-        return RedirectResponse(url=authorization_url)
+
+        # INSTEAD of RedirectResponse, return JSONResponse
+        return JSONResponse(
+            content={"authorization_url": authorization_url}
+        )
 
     @router.get("/google/callback", tags=["auth"])
     async def google_callback(
@@ -135,7 +142,7 @@ if google_oauth_client:
             
             logger.info(f"JWT token generated for user: {user.id}")
 
-            frontend_callback_url = f"{settings.FRONTEND_URL}/auth/callback#access_token={token}&token_type=bearer"
+            frontend_callback_url = f"{settings.FRONTEND_URL}/oauth-callback#access_token={token}&token_type=bearer"
             return RedirectResponse(url=frontend_callback_url, status_code=status.HTTP_302_FOUND)
 
         except GetIdEmailError:
