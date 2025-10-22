@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_, desc, text, or_
 from typing import List, Optional
 from datetime import datetime, timedelta
+import math
 
 from app.core.database import get_async_session
 from app.core.auth import current_active_user
@@ -245,14 +246,15 @@ async def get_gym_leaderboard(
     # Convert to LeaderboardEntry objects
     leaderboard_entries = []
     for row in leaderboard_data:
+        user_name = row.full_name if row.full_name else row.username or "Anonymous"
+        
         entry = LeaderboardEntry(
             user_id=row.user_id,
-            username=row.username or "Anonymous",
-            full_name=row.full_name,
+            user_name=user_name,
             total_workouts=row.total_workouts,
             total_calories_burned=float(row.total_calories_burned),
-            total_workout_time_hours=float(row.total_workout_time_hours),
-            consistency_score=float(row.consistency_score),
+            total_minutes=int(row.total_minutes),
+            consistency_score=round(float(row.consistency_score),1),
             rank=row.rank
         )
         leaderboard_entries.append(entry)
@@ -265,6 +267,7 @@ async def get_gym_leaderboard(
     return LeaderboardResponse(
         gym_id=gym.id,
         gym_name=gym.name,
+        gym_address=gym.address, # 👈 ADD ADDRESS HERE
         leaderboard=leaderboard_entries,
         total_members=total_members
     )

@@ -2,6 +2,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_, or_
+from sqlalchemy.orm import aliased # 👈 ADD THIS IMPORT
 from typing import List, Optional
 from datetime import datetime
 
@@ -27,7 +28,28 @@ async def list_gyms(
     current_user: User = Depends(current_active_user)
 ):
     """List all gyms with optional search and pagination"""
-    query = select(Gym)
+    
+    member_count_subquery = (
+        select(
+            User.gym_id,
+            func.count(User.id).label("member_count")
+        )
+        .where(User.gym_id.isnot(None)) # Only count users associated with a gym
+        .group_by(User.gym_id)
+        .subquery()
+    )
+    # Alias the subquery for easier joining
+    mc_alias = aliased(member_count_subquery, name="member_counts")
+    
+    query = (
+        select(
+            Gym,
+            # Use coalesce to return 0 if a gym has no members (left join)
+            func.coalesce(mc_alias.c.member_count, 0).label("member_count")
+        )
+        # Use outerjoin to include gyms with 0 members
+        .outerjoin(mc_alias, Gym.id == mc_alias.c.gym_id)
+    )
     
     if search:
         search_filter = or_(
@@ -37,10 +59,21 @@ async def list_gyms(
         )
         query = query.where(search_filter)
     
-    query = query.offset(skip).limit(limit).order_by(Gym.name)
+    query = query.order_by(Gym.name).offset(skip).limit(limit)
     result = await session.execute(query)
-    gyms = result.scalars().all()
-    return gyms
+    gym_results = result.all() # Fetch all rows (Gym, member_count)
+    
+    gyms_with_counts = []
+    for gym_object, member_count in gym_results:
+        # Create a dictionary from the Gym object attributes
+        gym_dict = {column.name: getattr(gym_object, column.name) for column in Gym.__table__.columns}
+        # Add the member count
+        gym_dict["member_count"] = member_count
+        # Validate and append using the GymSchema
+        gyms_with_counts.append(GymSchema.model_validate(gym_dict))
+    # --- 👆 END OF RESULT PROCESSING ---
+
+    return gyms_with_counts
 
 
 @router.get("/{gym_id}", response_model=GymSchema)

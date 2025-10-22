@@ -378,6 +378,7 @@ class Gym(GymBase):
     google_place_id: Optional[str] = None
     created_at: datetime
     updated_at: Optional[datetime] = None
+    member_count: int = 0 # 👈 ADD THIS LINE with a default
 
     class Config:
         from_attributes = True
@@ -416,18 +417,18 @@ class GymOccupancyResponse(BaseModel):
 
 class LeaderboardEntry(BaseModel):
     user_id: uuid.UUID
-    username: str
-    full_name: Optional[str] = None
+    user_name: str # Combined name field
     total_workouts: int
-    total_calories_burned: float
-    total_workout_time_hours: float
-    consistency_score: float  # Percentage of days with workouts in last 30 days
+    total_calories_burned: float # Keep this name, frontend uses total_calories
+    total_minutes: int # Changed from hours to minutes
+    consistency_score: float # Keep consistency_score, frontend will need to adapt
     rank: int
 
 
 class LeaderboardResponse(BaseModel):
     gym_id: int
     gym_name: str
+    gym_address: str # 👈 ADD THIS FIELD
     leaderboard: List[LeaderboardEntry]
     total_members: int
 
