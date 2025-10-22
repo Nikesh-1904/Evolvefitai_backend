@@ -59,6 +59,27 @@ class LoggedExercise(BaseModel):
     exercise_type: Optional[ExerciseType] = None  # We need this to know how to interpret the sets data
     sets: List[AnyLoggedSet]
 
+# 1. Schema for the UserAchievement model
+class UserAchievementBase(BaseModel):
+    achievement_id: str
+
+class UserAchievement(UserAchievementBase):
+    id: int
+    user_id: uuid.UUID
+    unlocked_at: datetime
+
+    class Config:
+        from_attributes = True
+
+# 2. Schema for the request to unlock an achievement
+class AchievementUnlockRequest(BaseModel):
+    achievement_id: str
+
+# 3. Schema for the response from our new endpoints
+class AchievementStatus(BaseModel):
+    total_points: int
+    level: int
+    unlocked_achievements: List[UserAchievement]
 
 # User schemas
 class UserRead(schemas.BaseUser[uuid.UUID]):
@@ -411,24 +432,3 @@ class LeaderboardResponse(BaseModel):
     total_members: int
 
 
-# 1. Schema for the UserAchievement model
-class UserAchievementBase(BaseModel):
-    achievement_id: str
-
-class UserAchievement(UserAchievementBase):
-    id: int
-    user_id: uuid.UUID
-    unlocked_at: datetime
-
-    class Config:
-        from_attributes = True
-
-# 2. Schema for the request to unlock an achievement
-class AchievementUnlockRequest(BaseModel):
-    achievement_id: str
-
-# 3. Schema for the response from our new endpoints
-class AchievementStatus(BaseModel):
-    total_points: int
-    level: int
-    unlocked_achievements: List[UserAchievement]
