@@ -142,7 +142,7 @@ if google_oauth_client:
             
             logger.info(f"JWT token generated for user: {user.id}")
 
-            frontend_callback_url = f"{settings.FRONTEND_URL}/oauth-callback#access_token={token}&token_type=bearer"
+            frontend_callback_url = f"{settings.FRONTEND_URL}/oauth-callback?access_token={token}&token_type=bearer"
             return RedirectResponse(url=frontend_callback_url, status_code=status.HTTP_302_FOUND)
 
         except GetIdEmailError:
