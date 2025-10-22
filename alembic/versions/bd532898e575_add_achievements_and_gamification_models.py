@@ -28,8 +28,8 @@ def upgrade() -> None:
     )
     op.create_index(op.f('ix_user_achievements_achievement_id'), 'user_achievements', ['achievement_id'], unique=False)
     op.create_index(op.f('ix_user_achievements_id'), 'user_achievements', ['id'], unique=False)
-    op.add_column('users', sa.Column('total_points', sa.Integer(), nullable=False))
-    op.add_column('users', sa.Column('level', sa.Integer(), nullable=False))
+    op.add_column('users', sa.Column('total_points', sa.Integer(), nullable=False, server_default='0'))
+    op.add_column('users', sa.Column('level', sa.Integer(), nullable=False, server_default='1'))
     op.create_index(op.f('ix_users_total_points'), 'users', ['total_points'], unique=False)
     # ### end Alembic commands ###
 
