@@ -5,7 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional
 from datetime import datetime
-
+import math  # 👈 --- 1. ADD THIS IMPORT ---
 from app.core.database import get_async_session
 from app.core.auth import current_active_user
 from app import models, schemas
@@ -74,6 +74,25 @@ async def create_workout_plan(
     await session.commit()
     await session.refresh(db_plan)
     return db_plan
+
+levelSystem = {
+  1: { 'minPoints': 0, 'maxPoints': 499 },
+  2: { 'minPoints': 500, 'maxPoints': 999 },
+  3: { 'minPoints': 1000, 'maxPoints': 1999 },
+  4: { 'minPoints': 2000, 'maxPoints': 3999 },
+  5: { 'minPoints': 4000, 'maxPoints': 7999 },
+  6: { 'minPoints': 8000, 'maxPoints': 15999 },
+  7: { 'minPoints': 16000, 'maxPoints': 31999 },
+  8: { 'minPoints': 32000, 'maxPoints': 63999 },
+  9: { 'minPoints': 64000, 'maxPoints': 127999 },
+  10: { 'minPoints': 128000, 'maxPoints': float('inf') },
+}
+
+def calculate_level(points: int) -> int:
+    for level, data in levelSystem.items():
+        if points >= data['minPoints'] and points <= data['maxPoints']:
+            return int(level)
+    return 1
 
 @router.get("/logs", response_model=List[schemas.WorkoutLog])
 async def get_workout_logs(
@@ -151,6 +170,14 @@ async def log_workout(
         workout_date=workout_log.workout_date or datetime.utcnow()
     )
     session.add(db_log)
+    
+    points_earned = math.floor(total_calories_burned / 2)
+    
+    if points_earned > 0:
+        current_user.total_points += points_earned
+        # Recalculate and update the user's level
+        current_user.level = calculate_level(current_user.total_points)
+    
     await session.commit()
     await session.refresh(db_log)
     return db_log

@@ -4,11 +4,24 @@ from datetime import date, timedelta
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import List
+from typing import List, Dict, Any
 
 from app.core.database import get_async_session
 from app.core.auth import current_active_user
 from app import models, schemas
+
+levelSystem: Dict[int, Dict[str, Any]] = {
+  1: { 'minPoints': 0, 'maxPoints': 499 },
+  2: { 'minPoints': 500, 'maxPoints': 999 },
+  3: { 'minPoints': 1000, 'maxPoints': 1999 },
+  4: { 'minPoints': 2000, 'maxPoints': 3999 },
+  5: { 'minPoints': 4000, 'maxPoints': 7999 },
+  6: { 'minPoints': 8000, 'maxPoints': 15999 },
+  7: { 'minPoints': 16000, 'maxPoints': 31999 },
+  8: { 'minPoints': 32000, 'maxPoints': 63999 },
+  9: { 'minPoints': 64000, 'maxPoints': 127999 },
+  10: { 'minPoints': 128000, 'maxPoints': float('inf') },
+}
 
 router = APIRouter()
 
@@ -79,23 +92,26 @@ async def get_dashboard_overview(
     time_change = calculate_change(today_duration, yesterday_duration)
 
     # ... (Level progress calculation remains the same) ...
-    total_lifetime_calories = lifetime_stats.total_calories_burned or 0
-    points = total_lifetime_calories / 2
-    level = 1
-    points_for_current_level = 0
-    points_for_next_level = 100
-    temp_threshold = 100
-    while points >= temp_threshold:
-        level += 1
-        points_for_current_level = temp_threshold
-        temp_threshold *= 5
-        points_for_next_level = temp_threshold
+    current_level = current_user.level
+    current_points = current_user.total_points
+    
+    # Get current level's min points
+    points_for_current_level = levelSystem.get(current_level, {}).get('minPoints', 0)
+    
+    # Get next level's min points (which is the goal for the progress bar)
+    next_level_data = levelSystem.get(current_level + 1)
+    
+    if next_level_data:
+        points_for_next_level = next_level_data.get('minPoints', current_points)
+    else:
+        # User is at max level, so progress bar is full
+        points_for_next_level = levelSystem.get(current_level, {}).get('maxPoints', current_points)
     
     level_progress_data = schemas.LevelProgress(
-        current_level=level,
-        current_points=int(points),
-        points_for_current_level=points_for_current_level,
-        points_for_next_level=points_for_next_level
+        current_level=current_level,
+        current_points=current_points,
+        points_for_current_level=int(points_for_current_level),
+        points_for_next_level=int(points_for_next_level)
     )
 
     # --- Construct the final response using the correct '.calories' attribute ---
