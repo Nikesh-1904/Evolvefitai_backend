@@ -75,6 +75,7 @@ class UserRead(schemas.BaseUser[uuid.UUID]):
     activity_level: Optional[str] = None
     dietary_restrictions: Optional[List[str]] = []
     has_completed_onboarding: bool
+    preferences: Optional[Dict[str, Any]] = {}
     gym_id: Optional[int] = None  # NEW
     last_gym_change: Optional[datetime] = None  # NEW
     is_active: bool
@@ -104,6 +105,7 @@ class UserUpdate(schemas.BaseUserUpdate):
     activity_level: Optional[str] = None
     dietary_restrictions: Optional[List[str]] = []
     has_completed_onboarding: Optional[bool] = None
+    preferences: Optional[Dict[str, Any]] = None
     gym_id: Optional[int] = None  # NEW
 
     @validator("username")

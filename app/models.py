@@ -40,6 +40,7 @@ class User(SQLAlchemyBaseUserTableUUID, Base):
     dietary_restrictions: Mapped[list] = mapped_column(JSON, default=list)
     has_completed_onboarding: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     
+    preferences: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
     # NEW: Gym affiliation fields
     gym_id: Mapped[int] = mapped_column(Integer, ForeignKey("gyms.id"), nullable=True, index=True)
     last_gym_change: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
