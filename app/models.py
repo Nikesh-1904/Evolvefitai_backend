@@ -41,6 +41,8 @@ class User(SQLAlchemyBaseUserTableUUID, Base):
     has_completed_onboarding: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     
     preferences: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
+    total_points: Mapped[int] = mapped_column(Integer, default=0, nullable=False, index=True)
+    level: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     # NEW: Gym affiliation fields
     gym_id: Mapped[int] = mapped_column(Integer, ForeignKey("gyms.id"), nullable=True, index=True)
     last_gym_change: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -52,6 +54,7 @@ class User(SQLAlchemyBaseUserTableUUID, Base):
     workout_logs: Mapped[List["WorkoutLog"]] = relationship(back_populates="user")
     workout_plans: Mapped[List["WorkoutPlan"]] = relationship(back_populates="user")
     meal_plans: Mapped[List["MealPlan"]] = relationship(back_populates="user")
+    achievements: Mapped[List["UserAchievement"]] = relationship(back_populates="user")
     tip_interactions: Mapped[List["TipInteraction"]] = relationship(back_populates="user")
     video_preferences: Mapped[List["VideoPreference"]] = relationship(back_populates="user")
     
@@ -245,3 +248,17 @@ class GymBooking(Base):
     # Relationships
     user: Mapped["User"] = relationship(back_populates="gym_bookings")
     gym: Mapped["Gym"] = relationship(back_populates="bookings")
+
+class UserAchievement(Base):
+    """Stores a record of an achievement unlocked by a user."""
+    __tablename__ = "user_achievements"
+    
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(pgUUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    
+    # This will be the string ID like "first_workout"
+    achievement_id: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    
+    unlocked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    
+    user: Mapped["User"] = relationship(back_populates="achievements")

@@ -12,3 +12,4 @@ api_router.include_router(meal_plans.router, prefix="/meal-plans", tags=["meal_p
 api_router.include_router(stats.router, prefix="/stats", tags=["stats"]) # 👈 Add this line
 api_router.include_router(gyms.router, prefix="/gyms", tags=["gyms"])
 api_router.include_router(community.router, prefix="/community", tags=["community"])
+api_router.include_router(achievements.router, prefix="/achievements", tags=["achievements"])
