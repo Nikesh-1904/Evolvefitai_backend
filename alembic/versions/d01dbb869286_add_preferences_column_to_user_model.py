@@ -84,7 +84,7 @@ def upgrade() -> None:
                existing_type=postgresql.TIMESTAMP(timezone=True),
                nullable=False,
                existing_server_default=sa.text('now()'))
-    op.add_column('users', sa.Column('preferences', sa.JSON(), nullable=False))
+    op.add_column('users', sa.Column('preferences', sa.JSON(), nullable=False, server_default='{}'))
     op.alter_column('users', 'dietary_restrictions',
                existing_type=postgresql.JSON(astext_type=sa.Text()),
                nullable=False)
