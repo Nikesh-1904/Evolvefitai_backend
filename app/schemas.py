@@ -370,20 +370,20 @@ class GymBase(BaseModel):
 
 
 class GymCreate(GymBase):
-    google_place_id: Optional[str] = None
+    gym_code: Optional[str] = None
 
 
 class Gym(GymBase):
     id: int
-    google_place_id: Optional[str] = None
     created_at: datetime
     updated_at: Optional[datetime] = None
     member_count: int = 0 # 👈 ADD THIS LINE with a default
+    gym_code: Optional[str] = None
 
     class Config:
         from_attributes = True
-
-
+class JoinByCodeRequest(BaseModel):
+    gym_code: str
 class GymBookingBase(BaseModel):
     gym_id: int
     start_time: datetime

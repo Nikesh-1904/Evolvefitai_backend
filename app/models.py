@@ -212,11 +212,9 @@ class Gym(Base):
     # Operating hours stored as JSON
     # Format: {"monday": {"open": "06:00", "close": "22:00"}, ...}
     operating_hours: Mapped[dict] = mapped_column(JSON, default=dict)
-    
+    gym_code: Mapped[Optional[str]] = mapped_column(String, unique=True, index=True, nullable=True)
     # Capacity and settings
-    max_capacity: Mapped[int] = mapped_column(Integer, default=100)
-    google_place_id: Mapped[str] = mapped_column(String, unique=True, nullable=True, index=True)
-    
+    max_capacity: Mapped[int] = mapped_column(Integer, default=100)    
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), onupdate=func.now(), nullable=True)

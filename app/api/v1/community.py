@@ -14,7 +14,8 @@ from app.schemas import (
     GymBookingCreate,
     LeaderboardResponse,
     LeaderboardEntry,
-    MessageResponse
+    MessageResponse,
+    JoinByCodeRequest
 )
 
 router = APIRouter()
@@ -287,3 +288,47 @@ async def get_my_gym_leaderboard(
         )
     
     return await get_gym_leaderboard(current_user.gym_id, limit, session, current_user)
+
+@router.post("/join-by-code", response_model=MessageResponse)
+async def join_gym_by_code(
+    request_data: JoinByCodeRequest,
+    session: AsyncSession = Depends(get_async_session),
+    current_user: User = Depends(current_active_user)
+):
+    """Join a gym using its unique code."""
+    gym_code = request_data.gym_code.strip().upper() # Standardize code format
+
+    if not gym_code:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Gym code cannot be empty."
+        )
+
+    # Find the gym by code (case-insensitive search if needed, adjust DB collation or use func.upper)
+    gym_query = select(Gym).where(func.upper(Gym.gym_code) == gym_code)
+    gym_result = await session.execute(gym_query)
+    gym = gym_result.scalar_one_or_none()
+
+    if not gym:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Invalid gym code."
+        )
+
+    # Check if user is already in this gym
+    if current_user.gym_id == gym.id:
+        return MessageResponse(
+            message=f"You are already a member of {gym.name}.",
+            success=True # Or False depending on how you want to handle this
+        )
+
+    # Update user's gym affiliation
+    current_user.gym_id = gym.id
+    current_user.last_gym_change = datetime.utcnow()
+
+    await session.commit()
+
+    return MessageResponse(
+        message=f"Successfully joined {gym.name}!",
+        success=True
+    )

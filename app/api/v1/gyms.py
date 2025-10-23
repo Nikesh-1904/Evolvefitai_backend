@@ -104,16 +104,14 @@ async def create_gym(
 ):
     """Create a new gym (admin only in production)"""
     # In production, you might want to add admin role check here
-    
-    # Check if gym with same google_place_id already exists
-    if gym_data.google_place_id:
-        existing_query = select(Gym).where(Gym.google_place_id == gym_data.google_place_id)
-        existing_result = await session.execute(existing_query)
-        if existing_result.scalar_one_or_none():
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Gym with this Google Place ID already exists"
-            )
+    if gym_data.gym_code:
+        code_check_query = select(Gym).where(func.upper(Gym.gym_code) == gym_data.gym_code.strip().upper())
+        code_result = await session.execute(code_check_query)
+        if code_result.scalar_one_or_none():
+             raise HTTPException(
+                 status_code=status.HTTP_400_BAD_REQUEST,
+                 detail="A gym with this code already exists."
+             )
     
     gym = Gym(**gym_data.model_dump())
     session.add(gym)
