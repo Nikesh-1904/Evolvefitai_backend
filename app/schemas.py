@@ -405,7 +405,7 @@ class JoinByCodeRequest(BaseModel):
 
 
 class GymBookingBase(BaseModel):
-    gym_id: int
+    gym_id: uuid.UUID
     start_time: datetime
     end_time: datetime
 
@@ -426,7 +426,7 @@ class GymBooking(GymBookingBase):
 
 
 class GymOccupancyResponse(BaseModel):
-    gym_id: int
+    gym_id: uuid.UUID
     gym_name: str
     current_occupancy: int
     max_capacity: int
@@ -446,7 +446,7 @@ class LeaderboardEntry(BaseModel):
 
 
 class LeaderboardResponse(BaseModel):
-    gym_id: int
+    gym_id: uuid.UUID
     gym_name: str
     gym_address: str
     leaderboard: List[LeaderboardEntry]
