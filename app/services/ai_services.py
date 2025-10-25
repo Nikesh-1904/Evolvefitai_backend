@@ -98,7 +98,7 @@ class OpenRouterAI:
         self.headers = {
             "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
             "Content-Type": "application/json",
-            "HTTP-Referer": settings.FRONTEND_URL,
+            "HTTP-Referer": settings.CLIENT_FRONTEND_URL,
             "X-Title": "EvolveFit AI"
         }
         self.available_models = [
@@ -230,7 +230,7 @@ class OllamaAI:
     """Local AI using Ollama"""
 
     def __init__(self):
-        self.api_url = f"{settings.OLLAMA_URL}/api/generate"
+        self.api_url = f"{settings.OLLAMA_BASE_URL}/api/generate"
         self.available_models = ["llama3.2", "llama3.1", "mistral", "codellama", "gemma2"]
         self.current_model_index = 0
 

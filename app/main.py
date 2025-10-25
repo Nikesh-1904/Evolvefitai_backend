@@ -1,48 +1,137 @@
-from contextlib import asynccontextmanager
+# app/main.py
+"""FastAPI application entry point"""
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from contextlib import asynccontextmanager
+import logging
+
 from app.core.config import settings
-from app.api.v1.api import api_router
 from app.core.database import create_db_and_tables
+
+# Import routers
+from app.api.v1.api import api_router  # Existing client routes
+from app.business.api import business_router  # Business routes
+from app.shared.api import shared_router  # Shared routes
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
-    Handle application startup and shutdown events.
+    Lifespan context manager for startup and shutdown events
+    
+    Startup:
+    - Create database tables if they don't exist
+    - Start background services (future: fee reminders scheduler)
+    
+    Shutdown:
+    - Clean up resources
     """
-    print("INFO:     Server starting up...")
+    # Startup
+    logger.info("Starting EvolveFit AI Backend...")
+    logger.info(f"Environment: {'Development' if settings.DEBUG else 'Production'}")
+    
+    # Create database tables
     await create_db_and_tables()
-    print("INFO:     Database tables checked/created.")
+    logger.info("Database tables created/verified")
+    
+    # TODO: Start background scheduler for fee reminders
+    # from app.business.services.fee_reminder_service import start_scheduler
+    # start_scheduler()
+    
+    logger.info("Application startup complete")
+    
     yield
-    print("INFO:     Server shutting down...")
+    
+    # Shutdown
+    logger.info("Shutting down EvolveFit AI Backend...")
+    # TODO: Stop background scheduler
+    logger.info("Shutdown complete")
 
+
+# Create FastAPI application
 app = FastAPI(
-    title=settings.PROJECT_NAME,
-    version=settings.VERSION,
-    description="EvolveFit AI - Your Intelligent Fitness Companion with AI-powered workouts, meal planning, and plateau detection",
-    lifespan=lifespan  # Use the modern lifespan event handler
+    title=settings.APP_NAME,
+    version="2.0.0",
+    description="Fitness tracking platform with AI-powered workouts, meal plans, and gym management",
+    lifespan=lifespan
 )
 
-# CORS configuration
+# CORS Configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        settings.FRONTEND_URL,
-        "https://evolvefitai-frontend.vercel.app",
-    ],
+    allow_origins=settings.ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["Authorization", "Content-Type", "access-control-allow-origin"],
+    allow_headers=["*"],
 )
 
-# Include API routes
-app.include_router(api_router, prefix="/api/v1")
+# Include routers
 
-@app.get("/")
+# Client routes (existing)
+app.include_router(
+    api_router,
+    prefix="/api/v1"
+)
+
+# Business routes (new)
+app.include_router(
+    business_router,
+    prefix="/api/v1/business",
+    tags=["business"]
+)
+
+# Shared routes (new)
+app.include_router(
+    shared_router,
+    prefix="/api/v1",
+    tags=["shared"]
+)
+
+# Root endpoint
+@app.get("/", tags=["root"])
 async def root():
-    return {"message": "EvolveFit AI Backend is running!", "version": settings.VERSION}
+    """API root endpoint"""
+    return {
+        "message": "Welcome to EvolveFit AI API",
+        "version": "2.0.0",
+        "docs": "/docs",
+        "health": "/health"
+    }
 
-@app.get("/health")
+# Health check endpoint
+@app.get("/health", tags=["health"])
 async def health_check():
-    return {"status": "healthy", "version": settings.VERSION}
+    """Health check endpoint for monitoring"""
+    return {
+        "status": "healthy",
+        "app": settings.APP_NAME,
+        "version": "2.0.0"
+    }
+
+
+# Request logging middleware (optional)
+@app.middleware("http")
+async def log_requests(request, call_next):
+    """Log all HTTP requests"""
+    logger.info(f"{request.method} {request.url.path}")
+    response = await call_next(request)
+    logger.info(f"Status: {response.status_code}")
+    return response
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(
+        "app.main:app",
+        host="0.0.0.0",
+        port=8000,
+        reload=settings.DEBUG
+    )

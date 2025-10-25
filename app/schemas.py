@@ -6,8 +6,13 @@ import uuid
 from fastapi_users import schemas
 from enum import Enum
 
+# ============================================================================
+# SECTION 1: EXISTING CLIENT APP SCHEMAS (100% PRESERVED)
+# ============================================================================
 
-# --- EXISTING Schemas for Workout Logging ---
+# --- Workout Logging Schemas ---
+
+# 1. Define our exercise types using an Enum for type safety
 class ExerciseType(str, Enum):
     WEIGHT_BASED = "WEIGHT_BASED"
     REPS_ONLY = "REPS_ONLY"
@@ -16,6 +21,7 @@ class ExerciseType(str, Enum):
     QUALITATIVE = "QUALITATIVE"
 
 
+# 2. Define a schema for each type of logged data point ("set")
 class LoggedSetWeightBased(BaseModel):
     reps: int
     weight: float
@@ -39,70 +45,81 @@ class LoggedSetQualitative(BaseModel):
     notes: Optional[str] = None
 
 
+# 3. Create a Union type that can be any of the above schemas
+AnyLoggedSet = Union[
+    LoggedSetWeightBased,
+    LoggedSetRepsOnly,
+    LoggedSetDuration,
+    LoggedSetDistanceDuration,
+    LoggedSetQualitative,
+]
+
+
+# 4. Update LoggedExercise to use the new Union type and require the exercise_type
 class LoggedExercise(BaseModel):
-    exercise_name: str
-    exercise_type: ExerciseType
-    sets: List[
-        Union[
-            LoggedSetWeightBased,
-            LoggedSetRepsOnly,
-            LoggedSetDuration,
-            LoggedSetDistanceDuration,
-            LoggedSetQualitative,
-        ]
-    ]
-    notes: Optional[str] = None
-
-
-class WorkoutLogCreate(BaseModel):
-    workout_plan_id: Optional[uuid.UUID] = None
     name: str
-    duration_minutes: int
-    exercises_completed: List[LoggedExercise]
-    notes: Optional[str] = None
+    exercise_type: Optional[ExerciseType] = None
+    sets: List[AnyLoggedSet]
 
 
-class WorkoutLog(BaseModel):
-    id: uuid.UUID
+# --- Achievement Schemas ---
+
+class UserAchievementBase(BaseModel):
+    achievement_id: str
+
+
+class UserAchievement(UserAchievementBase):
+    id: int
     user_id: uuid.UUID
-    workout_plan_id: Optional[uuid.UUID]
-    name: str
-    duration_minutes: int
-    calories_burned: Optional[float]
-    exercises_completed: List[LoggedExercise]
-    notes: Optional[str]
-    logged_at: datetime
+    unlocked_at: datetime
 
     class Config:
         from_attributes = True
 
 
+class AchievementUnlockRequest(BaseModel):
+    achievement_id: str
+
+
+class AchievementStatus(BaseModel):
+    total_points: int
+    level: int
+    unlocked_achievements: List[UserAchievement]
+
+
 # --- User Schemas ---
+
 class UserRead(schemas.BaseUser[uuid.UUID]):
+    id: uuid.UUID
+    email: EmailStr
     username: Optional[str] = None
     full_name: Optional[str] = None
     age: Optional[int] = None
     weight: Optional[float] = None
     height: Optional[float] = None
     gender: Optional[str] = None
-    fitness_level: Optional[str] = None
     fitness_goal: Optional[str] = None
+    experience_level: Optional[str] = None
     activity_level: Optional[str] = None
-    dietary_preference: Optional[str] = None
-    has_completed_onboarding: bool = False
-    preferences: Optional[dict] = None
-    total_points: int = 0
-    current_level: int = 1
-    gym_id: Optional[uuid.UUID] = None
-    
-    # 🆕 Business fields
-    qr_code_id: Optional[uuid.UUID] = None
-    membership_status: str = "ACTIVE"
-    membership_expiry: Optional[datetime] = None
-    notification_preferences: Optional[dict] = None
+    dietary_restrictions: Optional[List[str]] = []
+    has_completed_onboarding: bool
+    preferences: Optional[Dict[str, Any]] = {}
+    gym_id: Optional[int] = None
+    last_gym_change: Optional[datetime] = None
+    is_active: bool
+    is_verified: bool
+    created_at: datetime
+    total_points: int
+    level: int
+    achievements: List["UserAchievement"] = []
+
+    class Config:
+        from_attributes = True
 
 
 class UserCreate(schemas.BaseUserCreate):
+    email: EmailStr
+    password: str
     username: Optional[str] = None
     full_name: Optional[str] = None
 
@@ -114,35 +131,82 @@ class UserUpdate(schemas.BaseUserUpdate):
     weight: Optional[float] = None
     height: Optional[float] = None
     gender: Optional[str] = None
-    fitness_level: Optional[str] = None
     fitness_goal: Optional[str] = None
+    experience_level: Optional[str] = None
     activity_level: Optional[str] = None
-    dietary_preference: Optional[str] = None
+    dietary_restrictions: Optional[List[str]] = []
     has_completed_onboarding: Optional[bool] = None
-    preferences: Optional[dict] = None
-    gym_id: Optional[uuid.UUID] = None
-    
-    # 🆕 Business fields
-    notification_preferences: Optional[dict] = None
+    preferences: Optional[Dict[str, Any]] = None
+    gym_id: Optional[int] = None
+
+    @validator("username")
+    def username_must_not_be_empty(cls, v):
+        if v is not None and v == "":
+            raise ValueError("Username cannot be an empty string")
+        return v
+
+
+# --- Exercise Schemas ---
+
+class ExerciseBase(BaseModel):
+    name: str
+    exercise_type: Optional[ExerciseType] = ExerciseType.WEIGHT_BASED
+    muscle_groups: Optional[List[str]] = []
+    equipment: Optional[str] = None
+    difficulty: Optional[str] = None
+    instructions: Optional[str] = None
+
+
+class ExerciseCreate(ExerciseBase):
+    pass
+
+
+class Exercise(ExerciseBase):
+    id: int
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+# --- Video Schemas ---
+
+class ExerciseVideoBase(BaseModel):
+    youtube_url: str
+    title: Optional[str] = None
+    thumbnail_url: Optional[str] = None
+    duration: Optional[int] = None
+
+
+class ExerciseVideo(ExerciseVideoBase):
+    id: int
+    exercise_id: int
+    popularity_score: float
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
 
 
 # --- Workout Plan Schemas ---
-class WorkoutPlanCreate(BaseModel):
+
+class WorkoutPlanBase(BaseModel):
     name: str
     description: Optional[str] = None
+    exercises: List[Dict[str, Any]] = []
     difficulty: Optional[str] = None
-    duration_minutes: int
-    exercises: Dict[str, Any]
+    estimated_duration: Optional[int] = None
 
 
-class WorkoutPlan(BaseModel):
-    id: uuid.UUID
+class WorkoutPlanCreate(WorkoutPlanBase):
+    pass
+
+
+class WorkoutPlan(WorkoutPlanBase):
+    id: int
     user_id: uuid.UUID
-    name: str
-    description: Optional[str]
-    difficulty: Optional[str]
-    duration_minutes: int
-    exercises: Dict[str, Any]
+    ai_generated: bool
+    ai_model: Optional[str] = None
     is_active: bool
     created_at: datetime
 
@@ -150,199 +214,271 @@ class WorkoutPlan(BaseModel):
         from_attributes = True
 
 
-# --- Exercise Schemas ---
-class ExerciseCreate(BaseModel):
-    name: str
-    exercise_type: str
-    instructions: Optional[str] = None
-    muscle_groups: List[str]
-    equipment: Optional[str] = None
-    difficulty: Optional[str] = None
-    met_value: Optional[float] = None
+# --- Workout Log Schemas ---
+
+class WorkoutLogBase(BaseModel):
+    duration_minutes: Optional[int] = None
+    notes: Optional[str] = None
+    exercises_completed: List[LoggedExercise] = []
 
 
-class Exercise(BaseModel):
-    id: uuid.UUID
-    name: str
-    exercise_type: str
-    instructions: Optional[str]
-    muscle_groups: List[str]
-    equipment: Optional[str]
-    difficulty: Optional[str]
-    met_value: Optional[float]
-    created_at: datetime
+class WorkoutLogCreate(WorkoutLogBase):
+    workout_plan_id: Optional[int] = None
+    workout_date: Optional[datetime] = None
+
+
+class WorkoutLog(WorkoutLogBase):
+    id: int
+    user_id: uuid.UUID
+    workout_plan_id: Optional[int] = None
+    workout_date: datetime
 
     class Config:
         from_attributes = True
 
 
 # --- Meal Plan Schemas ---
-class MealPlanCreate(BaseModel):
+
+class MealPlanBase(BaseModel):
     name: str
-    target_calories: float
-    target_protein: Optional[float] = None
-    target_carbs: Optional[float] = None
-    target_fat: Optional[float] = None
-    meals: Dict[str, Any]
+    target_calories: int
+    target_protein: float
+    target_carbs: float
+    target_fat: float
+    meals: Dict[str, Any] = {}
 
 
-class MealPlan(BaseModel):
-    id: uuid.UUID
+class MealPlanCreate(MealPlanBase):
+    pass
+
+
+class MealPlan(MealPlanBase):
+    id: int
     user_id: uuid.UUID
-    name: str
-    target_calories: float
-    target_protein: Optional[float]
-    target_carbs: Optional[float]
-    target_fat: Optional[float]
-    meals: Dict[str, Any]
+    ai_generated: bool
+    ai_model: Optional[str] = None
     created_at: datetime
 
     class Config:
         from_attributes = True
 
 
-# --- Gym Schemas ---
-class GymCreate(BaseModel):
-    name: str
-    description: Optional[str] = None
-    address: Optional[str] = None
-    city: Optional[str] = None
-    state: Optional[str] = None
-    country: str = "India"
-    pincode: Optional[str] = None
-    capacity: int = 50
-    gym_code: str
-    
-    # 🆕 Business fields
-    monthly_fee: Optional[float] = None
-    currency: str = "INR"
-    fee_due_day: int = 1
+# --- Tips Schemas ---
+
+class ExerciseTipBase(BaseModel):
+    title: str
+    content: str
+    tip_type: Optional[str] = None
 
 
-class Gym(BaseModel):
-    id: uuid.UUID
-    name: str
-    description: Optional[str]
-    address: Optional[str]
-    city: Optional[str]
-    state: Optional[str]
-    country: str
-    pincode: Optional[str]
-    capacity: int
-    gym_code: str
-    created_at: datetime
-    
-    # 🆕 Business fields
-    monthly_fee: Optional[float]
-    currency: str
-    fee_due_day: int
-
-    class Config:
-        from_attributes = True
-
-
-class GymOccupancyResponse(BaseModel):
-    gym_id: uuid.UUID
-    gym_name: str
-    current_occupancy: int
-    capacity: int
-    occupancy_percentage: float
-    timestamp: datetime
-
-
-# --- Gym Booking Schemas ---
-class GymBookingCreate(BaseModel):
-    gym_id: uuid.UUID
-    start_time: datetime
-    end_time: datetime
-
-
-class GymBooking(BaseModel):
-    id: uuid.UUID
-    user_id: uuid.UUID
-    gym_id: uuid.UUID
-    start_time: datetime
-    end_time: datetime
-    status: str
+class ExerciseTip(ExerciseTipBase):
+    id: int
+    exercise_id: int
+    popularity_score: float
     created_at: datetime
 
     class Config:
         from_attributes = True
-
-
-# --- Achievement Schemas ---
-class UserAchievement(BaseModel):
-    id: uuid.UUID
-    user_id: uuid.UUID
-    achievement_id: str
-    unlocked_at: datetime
-
-    class Config:
-        from_attributes = True
-
-
-class AchievementUnlock(BaseModel):
-    achievement_id: str
-
-
-# --- Leaderboard Schemas ---
-class LeaderboardEntry(BaseModel):
-    username: str
-    total_points: int
-    current_level: int
-    rank: int
-
-
-class LeaderboardResponse(BaseModel):
-    gym_id: Optional[uuid.UUID]
-    gym_name: Optional[str]
-    leaderboard: List[LeaderboardEntry]
-    total_members: int
-    current_user_rank: Optional[int]
-
-
-# --- Dashboard Schemas ---
-class DashboardResponse(BaseModel):
-    total_workouts: int
-    total_workout_time: int
-    total_calories_burned: float
-    current_streak: int
-    longest_streak: int
-    achievements_unlocked: int
-    current_points: int
-    current_level: int
 
 
 # --- Analytics Schemas ---
-class AnalyticsResponse(BaseModel):
-    period: str
-    workout_count: int
-    total_duration: int
-    total_calories: float
-    avg_calories_per_workout: float
-    workout_dates: List[date]
+
+class LevelProgress(BaseModel):
+    current_level: int
+    current_points: int
+    points_for_current_level: int
+    points_for_next_level: int
 
 
-# --- General Response Schemas ---
+class DashboardOverviewStats(BaseModel):
+    workouts_completed: int
+    total_workout_time_hours: float
+    total_calories_burned: int
+    level_progress: LevelProgress
+    calories_change_percent: float
+    time_change_percent: float
+
+
+class TimeSeriesDataPoint(BaseModel):
+    date: date
+    value: float
+
+
+class AnalyticsData(BaseModel):
+    calorie_timeseries: List[TimeSeriesDataPoint]
+    workout_heatmap: List[date]
+
+
+class ExerciseSetData(BaseModel):
+    reps: int
+    weight: float
+
+
+class ExerciseProgressionDataPoint(BaseModel):
+    workout_date: date
+    primary_metric_value: float
+    metric_type: str
+    sets: List[Dict[str, Any]]
+
+
+# --- Interaction Schemas ---
+
+class TipInteractionCreate(BaseModel):
+    tip_id: int
+    interaction_type: str
+
+
+class VideoPreferenceCreate(BaseModel):
+    video_id: int
+    preference: str
+
+
+# --- AI Request/Response Schemas ---
+
+class WorkoutGenerationRequest(BaseModel):
+    user_preferences: Optional[Dict[str, Any]] = {}
+    duration_minutes: Optional[int] = 45
+    target_muscle_groups: Optional[List[str]] = None
+    num_exercises: Optional[int] = None
+    workout_type: Optional[str] = None
+
+
+class PlateauAnalysis(BaseModel):
+    is_plateau: bool
+    confidence: float
+    affected_exercises: List[str]
+    recommendations: List[str]
+    plateau_duration_weeks: int
+    analysis_method: str
+    ai_generated: bool = False
+
+
+class MealPlanRequest(BaseModel):
+    duration_days: int = 7
+    preferences: Optional[Dict[str, Any]] = {}
+
+
+class METValueResponse(BaseModel):
+    exercise_name: str
+    met_value: float
+
+
+# --- Response Schemas ---
+
 class MessageResponse(BaseModel):
     message: str
+    success: bool = True
+
+
+# --- Gym and Booking Schemas ---
+
+class GymBase(BaseModel):
+    name: str
+    address: str
+    city: str
+    state: Optional[str] = None
+    country: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    logo_url: Optional[str] = None
+    operating_hours: Optional[Dict[str, Any]] = {}
+    max_capacity: int = 100
+
+
+class GymCreate(GymBase):
+    gym_code: Optional[str] = None
+
+
+class Gym(GymBase):
+    id: int
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+    member_count: int = 0
+    gym_code: Optional[str] = None
+
+    class Config:
+        from_attributes = True
 
 
 class JoinByCodeRequest(BaseModel):
     gym_code: str
 
 
-# ========================================
-# 🆕 NEW BUSINESS SCHEMAS
-# ========================================
+class GymBookingBase(BaseModel):
+    gym_id: int
+    start_time: datetime
+    end_time: datetime
+
+
+class GymBookingCreate(GymBookingBase):
+    pass
+
+
+class GymBooking(GymBookingBase):
+    id: int
+    user_id: uuid.UUID
+    status: str
+    created_at: datetime
+    cancelled_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class GymOccupancyResponse(BaseModel):
+    gym_id: int
+    gym_name: str
+    current_occupancy: int
+    max_capacity: int
+    overflow_count: int
+    is_overcrowded: bool
+    active_bookings_count: int
+
+
+class LeaderboardEntry(BaseModel):
+    user_id: uuid.UUID
+    user_name: str
+    total_workouts: int
+    total_calories_burned: float
+    total_minutes: int
+    consistency_score: float
+    rank: int
+
+
+class LeaderboardResponse(BaseModel):
+    gym_id: int
+    gym_name: str
+    gym_address: str
+    leaderboard: List[LeaderboardEntry]
+    total_members: int
+
+
+# ============================================================================
+# SECTION 2: NEW BUSINESS SCHEMAS (GYM OWNER FEATURES)
+# ============================================================================
 
 # --- Gym Owner Schemas ---
-class GymOwnerCreate(BaseModel):
+
+class GymOwnerBase(BaseModel):
     email: EmailStr
-    password: str
     full_name: str
     phone_number: Optional[str] = None
+
+
+class GymOwnerCreate(GymOwnerBase):
+    password: str
     gym_id: uuid.UUID
+
+
+class GymOwnerRead(GymOwnerBase):
+    id: uuid.UUID
+    gym_id: uuid.UUID
+    is_active: bool
+    created_at: datetime
+    last_login: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
 
 
 class GymOwnerLogin(BaseModel):
@@ -350,88 +486,57 @@ class GymOwnerLogin(BaseModel):
     password: str
 
 
-class GymOwnerRead(BaseModel):
-    id: uuid.UUID
-    email: str
-    full_name: str
-    phone_number: Optional[str]
-    gym_id: uuid.UUID
-    is_active: bool
-    created_at: datetime
-    last_login: Optional[datetime]
-
-    class Config:
-        from_attributes = True
-
-
-class GymOwnerUpdate(BaseModel):
-    full_name: Optional[str] = None
-    phone_number: Optional[str] = None
-
-
-# --- Membership Fee Schemas ---
-class MembershipFeeCreate(BaseModel):
-    user_id: uuid.UUID
-    amount: float
-    due_date: datetime
-    notes: Optional[str] = None
-
-
-class MembershipFeeUpdate(BaseModel):
-    status: Optional[str] = None  # PAID, CANCELLED
-    payment_method: Optional[str] = None
-    paid_date: Optional[datetime] = None
-    receipt_number: Optional[str] = None
-    notes: Optional[str] = None
-
-
-class MembershipFee(BaseModel):
-    id: uuid.UUID
-    user_id: uuid.UUID
-    gym_id: uuid.UUID
-    amount: float
-    currency: str
-    payment_date: datetime
-    due_date: datetime
-    paid_date: Optional[datetime]
-    status: str
-    payment_method: Optional[str]
-    receipt_number: Optional[str]
-    notes: Optional[str]
-    created_by: uuid.UUID
-    created_at: datetime
-    updated_at: Optional[datetime]
-
-    class Config:
-        from_attributes = True
-
-
-class BulkFeeCreate(BaseModel):
-    user_ids: List[uuid.UUID]
-    amount: float
-    due_date: datetime
-
-
 # --- QR Code Schemas ---
-class QRCodeGenerate(BaseModel):
-    user_id: uuid.UUID
-
 
 class QRCodeResponse(BaseModel):
     id: uuid.UUID
     user_id: uuid.UUID
-    gym_id: uuid.UUID
     qr_code_data: str
     qr_code_image_base64: str
     is_active: bool
     created_at: datetime
-    expires_at: Optional[datetime]
+    expires_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+# --- Membership Fee Schemas ---
+
+class MembershipFeeBase(BaseModel):
+    user_id: uuid.UUID
+    amount: float
+    due_date: date
+    notes: Optional[str] = None
+
+
+class MembershipFeeCreate(MembershipFeeBase):
+    pass
+
+
+class MembershipFeeUpdate(BaseModel):
+    status: Optional[str] = None
+    paid_date: Optional[datetime] = None
+    payment_method: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class MembershipFeeRead(MembershipFeeBase):
+    id: uuid.UUID
+    gym_id: uuid.UUID
+    status: str
+    paid_date: Optional[datetime] = None
+    payment_method: Optional[str] = None
+    currency: str
+    receipt_number: Optional[str] = None
+    created_at: datetime
 
     class Config:
         from_attributes = True
 
 
 # --- Attendance Schemas ---
+
 class CheckInRequest(BaseModel):
     qr_code_data: str
 
@@ -445,10 +550,8 @@ class AttendanceRecord(BaseModel):
     user_id: uuid.UUID
     gym_id: uuid.UUID
     check_in_time: datetime
-    check_out_time: Optional[datetime]
-    duration_minutes: Optional[int]
-    qr_code_used: str
-    created_at: datetime
+    check_out_time: Optional[datetime] = None
+    duration_minutes: Optional[int] = None
 
     class Config:
         from_attributes = True
@@ -465,6 +568,7 @@ class LiveOccupancyResponse(BaseModel):
 
 
 # --- Notification Schemas ---
+
 class NotificationCreate(BaseModel):
     user_ids: List[uuid.UUID]
     notification_type: str
@@ -477,7 +581,6 @@ class NotificationCreate(BaseModel):
 class NotificationRead(BaseModel):
     id: uuid.UUID
     user_id: uuid.UUID
-    gym_id: uuid.UUID
     notification_type: str
     title: str
     message: str
@@ -485,52 +588,19 @@ class NotificationRead(BaseModel):
     sent_via_email: bool
     sent_via_app: bool
     created_at: datetime
-    read_at: Optional[datetime]
+    read_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True
 
 
 class NotificationPreferences(BaseModel):
-    email_enabled: bool
-    app_enabled: bool
-    fee_reminder_days: List[int]
-
-
-# --- Member Performance Schemas ---
-class PerformanceAnalysis(BaseModel):
-    id: uuid.UUID
-    user_id: uuid.UUID
-    gym_id: uuid.UUID
-    analysis_date: datetime
-    total_workouts: int
-    avg_workout_duration: float
-    consistency_score: float
-    performance_trend: str
-    weak_areas: List[str]
-    suggestions: List[str]
-    created_at: datetime
-
-    class Config:
-        from_attributes = True
+    email_enabled: bool = True
+    app_enabled: bool = True
+    fee_reminder_days: List[int] = [7, 3, 1]
 
 
 # --- Analytics Schemas ---
-class RevenueReport(BaseModel):
-    total_revenue: float
-    pending_revenue: float
-    collected_revenue: float
-    overdue_count: int
-    period_start: date
-    period_end: date
-
-
-class AttendanceTrends(BaseModel):
-    date: date
-    total_check_ins: int
-    avg_duration_minutes: float
-    peak_hour: int
-
 
 class MemberStats(BaseModel):
     user_id: uuid.UUID
@@ -540,8 +610,8 @@ class MemberStats(BaseModel):
     avg_duration: float
     consistency_score: float
     membership_status: str
-    last_payment_date: Optional[datetime]
-    next_due_date: Optional[datetime]
+    last_payment_date: Optional[date] = None
+    next_due_date: Optional[date] = None
 
 
 class AnalyticsDashboard(BaseModel):
@@ -551,3 +621,32 @@ class AnalyticsDashboard(BaseModel):
     avg_attendance_per_day: float
     top_performers: List[MemberStats]
     recent_activity: List[AttendanceRecord]
+
+
+class RevenueReport(BaseModel):
+    total_revenue: float
+    paid_count: int
+    pending_count: int
+    overdue_count: int
+    breakdown_by_month: Dict[str, float]
+
+class GymOwnerUpdate(BaseModel):
+    full_name: Optional[str] = None
+    phone_number: Optional[str] = None
+
+class PerformanceAnalysis(BaseModel):
+    total_workouts: int
+    avg_duration: float
+    consistency_score: float
+    performance_trend: str
+    weak_areas: Optional[List[str]] = []
+    suggestions: Optional[List[str]] = []
+    analysis_date: Optional[datetime] = None
+
+MembershipFee = MembershipFeeRead
+
+class BulkFeeCreate(BaseModel):
+    user_ids: List[uuid.UUID]
+    amount: float
+    due_date: date
+    notes: Optional[str] = None

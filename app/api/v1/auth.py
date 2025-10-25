@@ -3,7 +3,7 @@ import logging
 from fastapi import APIRouter, Depends, Request, HTTPException, status
 from fastapi.responses import RedirectResponse, JSONResponse
 from fastapi_users import exceptions
-from httpx_oauth.exceptions import GetIdEmailError
+from httpx_oauth.errors import GetIdEmailError
 
 from app.core.config import settings
 from app.core.auth import (
