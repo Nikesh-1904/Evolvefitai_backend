@@ -1,10 +1,9 @@
 from sqlalchemy import create_engine
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
-from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from app.core.config import settings
 from typing import AsyncGenerator
-
+from app.models.base import Base
 
 # Convert sync DATABASE_URL to async if needed
 database_url = settings.DATABASE_URL
@@ -20,8 +19,6 @@ async_session_maker = sessionmaker(engine, class_=AsyncSession, expire_on_commit
 # Sync engine for migrations
 sync_database_url = settings.DATABASE_URL
 sync_engine = create_engine(sync_database_url)
-
-Base = declarative_base()
 
 async def create_db_and_tables():
     async with engine.begin() as conn:

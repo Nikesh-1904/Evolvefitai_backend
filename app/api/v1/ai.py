@@ -2,11 +2,12 @@
 
 import logging
 import requests
-from fastapi import APIRouter, Depends, HTTPException
+import random
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import List, Optional, Dict
-from datetime import datetime
+from typing import List, Dict
+from datetime import datetime, timedelta, timezone
 
 from app.core.database import get_async_session
 from app.core.auth import current_active_user
@@ -233,7 +234,7 @@ async def search_youtube_videos(query: str, max_results: int = 3) -> List[Dict]:
         }
 
         logger.info(f"YouTube API: Searching for '{query}' videos")
-        response = requests.get(url, params=params, timeout=10)
+        response = requests.get(url, params=params, timeout=10) # type: ignore
 
         if response.status_code == 200:
             data = response.json()
@@ -436,13 +437,7 @@ async def generate_workout_plan(
         logger.error("=" * 100)
         raise HTTPException(status_code=500, detail=f"Workout generation failed: {str(e)}")
 
-# NEW: Create a separate response schema for generated meal plans (not stored in DB)
-class GeneratedMealPlan(schemas.MealPlanBase):
-    """Response schema for AI-generated meal plans that aren't stored in DB yet"""
-    ai_generated: bool = True
-    ai_model: Optional[str] = None
-
-@router.post("/meal-plans/generate", response_model=GeneratedMealPlan)
+@router.post("/meal-plans/generate", response_model=schemas.GeneratedMealPlan)
 async def generate_meal_plan(
     request: schemas.MealPlanRequest,
     current_user: models.User = Depends(current_active_user),
@@ -491,7 +486,7 @@ async def generate_meal_plan(
         logger.info("=" * 80)
 
         # Return the meal plan data directly (no DB fields required)
-        return GeneratedMealPlan(**meal_plan_data)
+        return schemas.GeneratedMealPlan(**meal_plan_data)
 
     except HTTPException:
         # Re-raise HTTPExceptions as-is
@@ -566,8 +561,8 @@ async def search_exercises(
                 logger.info(f"🎯 Found '{name}' in built-in exercise database")
 
                 # Get additional YouTube videos
-                youtube_videos = await search_youtube_videos(exercise_info["name"])
-                all_videos = exercise_info["videos"] + youtube_videos
+                youtube_videos = await search_youtube_videos(exercise_info["name"]) # type: ignore
+                all_videos = exercise_info["videos"] + youtube_videos # type: ignore
 
                 exercise_data = [{
                     "exercise": {
@@ -753,3 +748,116 @@ async def submit_exercise_feedback(
     except Exception as e:
         logger.error(f"💥 Exercise feedback submission failed: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to submit feedback: {str(e)}")
+
+ALL_MUSCLE_GROUPS = [
+    "chest", "back", "shoulders", "biceps", "triceps",
+    "forearms", "legs", "quadriceps", "hamstrings", "glutes",
+    "calves", "core", "abs", "cardio" # Removed 'full body' from master list for neglect calculation
+]
+
+@router.get("/workouts/recommend", response_model=schemas.WorkoutPlan)
+async def recommend_workout(
+    lookback_days: int = Query(7, ge=1, le=30, description="Number of days history to consider"),
+    current_user: models.User = Depends(current_active_user),
+    session: AsyncSession = Depends(get_async_session)
+):
+    """
+    Analyze user's workout history from the last 7 days (default) and recommend
+    the next workout focusing on neglected muscle groups using AI generation.
+    """
+    logger.info(f"🚀 Workout recommendation requested for user {current_user.id}")
+    start_time_request = datetime.now(timezone.utc) # Use timezone-aware datetime
+    lookback_date = start_time_request - timedelta(days=lookback_days)
+
+    # 1. Fetch recent workout logs
+    logs_query = (
+        select(models.WorkoutLog)
+        .where(models.WorkoutLog.user_id == current_user.id)
+        .where(models.WorkoutLog.workout_date >= lookback_date) # Filter by date
+    )
+    logs_result = await session.execute(logs_query)
+    recent_logs = logs_result.scalars().all()
+
+    target_muscles: List[str] = []
+
+    # 2. Analyze Muscle Groups or Handle No History
+    if not recent_logs:
+        logger.info(f"No workouts found in the last {lookback_days} days. Recommending 'full body'.")
+        target_muscles = ["full body"] # Case 3: No Workouts
+    else:
+        trained_groups: set[str] = set()
+        for log in recent_logs:
+            if not log.exercises_completed: # Skip logs with empty exercise lists
+                continue
+            for exercise in log.exercises_completed:
+                # Ensure muscle_groups is treated as a list, even if it's None or a string
+                groups = exercise.get("muscle_groups", [])
+                current_groups = []
+                if isinstance(groups, list):
+                    current_groups = groups
+                elif isinstance(groups, str):
+                    current_groups = [g.strip() for g in groups.split(',') if g.strip()]
+
+                trained_groups.update(g.lower() for g in current_groups)
+
+        logger.info(f"Trained muscle groups in last {lookback_days} days: {trained_groups}")
+
+        # Determine neglected groups
+        all_groups_set = set(g.lower() for g in ALL_MUSCLE_GROUPS)
+        neglected_groups = list(all_groups_set - trained_groups)
+
+        if not neglected_groups:
+            logger.info("All specific muscle groups trained recently. Recommending 'full body'.")
+            target_muscles = ["full body"] # Case 2: All Groups Trained
+        else:
+            logger.info(f"Neglected muscle groups: {neglected_groups}")
+            # Randomly select 1 to 3 neglected groups
+            num_to_select = min(len(neglected_groups), random.randint(1, 3))
+            target_muscles = random.sample(neglected_groups, num_to_select) # Case 1: Neglected Found
+            logger.info(f"Selected target muscles: {target_muscles}")
+
+    # 3. Generate Workout using AI
+    logger.info(f"Generating workout recommendation targeting: {target_muscles}")
+    try:
+        workout_data = await ai_workout_generator.generate_workout(
+            user=current_user,
+            duration_minutes=45, # You could make this configurable later
+            target_muscles=target_muscles
+        )
+    except Exception as e:
+         logger.error(f"AI workout generation failed during recommendation: {e}", exc_info=True)
+         raise HTTPException(
+             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+             detail="Failed to generate workout recommendation via AI."
+         )
+
+    # 4. Format and Return (without saving to DB)
+    # Add necessary fields expected by the schema but not returned by generator
+    # Ensure all required fields for WorkoutPlan schema are present
+    workout_data_validated = {
+        "id": 0, # Dummy ID as it's not saved
+        "user_id": current_user.id,
+        "name": workout_data.get("name", f"Recommended Workout for {', '.join(target_muscles)}"),
+        "description": workout_data.get("description", f"AI recommended workout focusing on {', '.join(target_muscles)}."),
+        "exercises": workout_data.get("exercises", []),
+        "difficulty": workout_data.get("difficulty_level", "intermediate"),
+        "estimated_duration": workout_data.get("estimated_duration", 45),
+        "ai_generated": workout_data.get("ai_generated", True),
+        "ai_model": workout_data.get("ai_model", "Recommendation Engine"),
+        "is_active": True, # Assume recommended plans are active
+        "created_at": datetime.now(timezone.utc) # Timestamp of recommendation
+    }
+
+    try:
+        # Validate the data against the schema before returning
+        final_plan = schemas.WorkoutPlan.model_validate(workout_data_validated)
+    except Exception as val_error:
+        logger.error(f"Failed to validate generated workout data against schema: {val_error}")
+        logger.error(f"Generated data was: {workout_data_validated}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="AI generated incompatible workout data."
+        )
+
+    logger.info(f"Successfully generated recommendation: '{final_plan.name}'")
+    return final_plan

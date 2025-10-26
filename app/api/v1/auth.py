@@ -3,8 +3,8 @@ import logging
 from fastapi import APIRouter, Depends, Request, HTTPException, status
 from fastapi.responses import RedirectResponse, JSONResponse
 from fastapi_users import exceptions
-from httpx_oauth.errors import GetIdEmailError
-
+from httpx_oauth.oauth2 import GetIdEmailError # type: ignore
+from typing import Optional # Add this import
 from app.core.config import settings
 from app.core.auth import (
     auth_backend,
@@ -71,20 +71,20 @@ if google_oauth_client:
     @router.get("/google/callback", tags=["auth"])
     async def google_callback(
         request: Request,
-        code: str = None,
-        error: str = None,
+        code: Optional[str] = None, # Use Optional[str]
+        error: Optional[str] = None, # Use Optional[str]
         user_manager = Depends(get_user_manager),
     ):
         """Handle Google OAuth callback and redirect to frontend with token"""
         
         if error:
             logger.warning(f"OAuth error received: {error}")
-            error_url = f"{settings.FRONTEND_URL}/login?error={error}"
+            error_url = f"{settings.CLIENT_FRONTEND_URL}/login?error={error}"
             return RedirectResponse(url=error_url, status_code=status.HTTP_302_FOUND)
 
         if not code:
             logger.warning("OAuth callback missing authorization code")
-            error_url = f"{settings.FRONTEND_URL}/login?error=missing_authorization_code"
+            error_url = f"{settings.CLIENT_FRONTEND_URL}/login?error=missing_authorization_code"
             return RedirectResponse(url=error_url, status_code=status.HTTP_302_FOUND)
 
         try:
@@ -129,12 +129,12 @@ if google_oauth_client:
                         raise
                 except Exception as link_error:
                     logger.error(f"OAuth account linking failed: {link_error}")
-                    error_url = f"{settings.FRONTEND_URL}/login?error=account_linking_failed"
+                    error_url = f"{settings.CLIENT_FRONTEND_URL}/login?error=account_linking_failed"
                     return RedirectResponse(url=error_url, status_code=status.HTTP_302_FOUND)
 
             except Exception as oauth_error:
                 logger.error(f"OAuth user creation failed: {oauth_error}", exc_info=True)
-                error_url = f"{settings.FRONTEND_URL}/login?error=user_creation_failed"
+                error_url = f"{settings.CLIENT_FRONTEND_URL}/login?error=user_creation_failed"
                 return RedirectResponse(url=error_url, status_code=status.HTTP_302_FOUND)
 
             jwt_strategy = get_jwt_strategy()
@@ -142,17 +142,17 @@ if google_oauth_client:
             
             logger.info(f"JWT token generated for user: {user.id}")
 
-            frontend_callback_url = f"{settings.FRONTEND_URL}/oauth-callback?access_token={token}&token_type=bearer"
+            frontend_callback_url = f"{settings.CLIENT_FRONTEND_URL}/oauth-callback?access_token={token}&token_type=bearer"
             return RedirectResponse(url=frontend_callback_url, status_code=status.HTTP_302_FOUND)
 
         except GetIdEmailError:
             logger.error("Failed to get user profile from Google")
-            error_url = f"{settings.FRONTEND_URL}/login?error=google_profile_access_failed"
+            error_url = f"{settings.CLIENT_FRONTEND_URL}/login?error=google_profile_access_failed"
             return RedirectResponse(url=error_url, status_code=status.HTTP_302_FOUND)
         
         except Exception as e:
             logger.error(f"Unexpected OAuth error: {e}", exc_info=True)
-            error_url = f"{settings.FRONTEND_URL}/login?error=oauth_failed"
+            error_url = f"{settings.CLIENT_FRONTEND_URL}/login?error=oauth_failed"
             return RedirectResponse(url=error_url, status_code=status.HTTP_302_FOUND)
 
 # --- FIX: Removed custom /me and /me patch endpoints ---

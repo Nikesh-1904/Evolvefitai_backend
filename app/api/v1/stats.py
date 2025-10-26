@@ -46,9 +46,7 @@ async def get_dashboard_overview(
         .where(models.WorkoutLog.user_id == current_user.id)
     )
     lifetime_result = await session.execute(lifetime_query)
-    lifetime_stats = lifetime_result.first()
-    total_lifetime_calories = lifetime_stats.total_calories_burned if lifetime_stats else 0
-    
+    lifetime_stats = lifetime_result.first()    
     # --- Query for TODAY'S stats ---
     today_query = (
         select(
@@ -60,8 +58,8 @@ async def get_dashboard_overview(
     )
     today_result = await session.execute(today_query)
     today_stats = today_result.first()
-    today_calories = today_stats.calories or 0
-    today_duration = today_stats.duration or 0
+    today_calories = today_stats.calories or 0  # type: ignore
+    today_duration = today_stats.duration or 0  # type: ignore
 
 
     # --- Query for YESTERDAY'S stats (for comparison) ---
@@ -75,8 +73,8 @@ async def get_dashboard_overview(
     )
     yesterday_result = await session.execute(yesterday_query)
     yesterday_stats = yesterday_result.first()
-    yesterday_calories = yesterday_stats.calories or 0
-    yesterday_duration = yesterday_stats.duration or 0
+    yesterday_calories = yesterday_stats.calories or 0 # type: ignore
+    yesterday_duration = yesterday_stats.duration or 0 # type: ignore
 
 
     # Helper function to calculate percentage change
@@ -116,9 +114,9 @@ async def get_dashboard_overview(
 
     # --- Construct the final response using the correct '.calories' attribute ---
     return schemas.DashboardOverviewStats(
-        total_calories_burned=int(today_calories),
+        total_calories_burned=int(lifetime_stats.total_calories_burned if lifetime_stats else 0), # TO THIS
         total_workout_time_hours=round(today_duration / 60, 1),
-        workouts_completed=lifetime_stats.workouts_completed or 0,
+        workouts_completed=lifetime_stats.workouts_completed if lifetime_stats else 0,
         level_progress=level_progress_data,
         calories_change_percent=calories_change,
         time_change_percent=time_change

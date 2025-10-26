@@ -3,7 +3,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from typing import List, Dict, Any
+from typing import Dict, Any
 
 from app.core.database import get_async_session
 from app.core.auth import current_active_user
@@ -63,12 +63,13 @@ async def get_achievement_status(
     result = await session.execute(
         select(models.UserAchievement).where(models.UserAchievement.user_id == user.id)
     )
-    unlocked_list = result.scalars().all()
+    unlocked_list_models = result.scalars().all()
+    unlocked_list_schemas = [schemas.UserAchievement.model_validate(ach) for ach in unlocked_list_models]
     
     return schemas.AchievementStatus(
         total_points=user.total_points,
         level=user.level,
-        unlocked_achievements=unlocked_list
+        unlocked_achievements=unlocked_list_schemas
     )
 
 

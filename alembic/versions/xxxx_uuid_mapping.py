@@ -11,7 +11,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import UUID
 
 revision = 'migrate_gyms_id_to_uuid'
-down_revision = 'a4d3c81bbd20'
+down_revision = 'add_business_models'
 branch_labels = None
 depends_on = None
 
