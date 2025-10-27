@@ -21,7 +21,7 @@ class UserAchievement(Base):
         pgUUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
     user_id: Mapped[uuid.UUID] = mapped_column(
-        pgUUID(as_uuid=True), ForeignKey("users.id")
+        pgUUID(as_uuid=True), ForeignKey("user.id")
     )
     achievement_id: Mapped[str] = mapped_column(String)
     unlocked_at: Mapped[datetime] = mapped_column(

@@ -21,7 +21,7 @@ class WorkoutPlan(Base):
         pgUUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
     user_id: Mapped[uuid.UUID] = mapped_column(
-        pgUUID(as_uuid=True), ForeignKey("users.id")
+        pgUUID(as_uuid=True), ForeignKey("user.id")
     )
     name: Mapped[str] = mapped_column(String)
     description: Mapped[str] = mapped_column(Text, nullable=True)
@@ -44,7 +44,7 @@ class WorkoutLog(Base):
         pgUUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
     user_id: Mapped[uuid.UUID] = mapped_column(
-        pgUUID(as_uuid=True), ForeignKey("users.id")
+        pgUUID(as_uuid=True), ForeignKey("user.id")
     )
     workout_plan_id: Mapped[uuid.UUID] = mapped_column(
         pgUUID(as_uuid=True), ForeignKey("workout_plans.id"), nullable=True

@@ -147,7 +147,7 @@ class UserQRCode(Base):
         pgUUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
     user_id: Mapped[uuid.UUID] = mapped_column(
-        pgUUID(as_uuid=True), ForeignKey("users.id"), nullable=False, unique=True
+        pgUUID(as_uuid=True), ForeignKey("user.id"), nullable=False, unique=True
     )
     gym_id: Mapped[uuid.UUID] = mapped_column(
         pgUUID(as_uuid=True), ForeignKey("gyms.id"), nullable=False
@@ -176,7 +176,7 @@ class GymBooking(Base):
         pgUUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
     user_id: Mapped[uuid.UUID] = mapped_column(
-        pgUUID(as_uuid=True), ForeignKey("users.id")
+        pgUUID(as_uuid=True), ForeignKey("user.id")
     )
     gym_id: Mapped[uuid.UUID] = mapped_column(
         pgUUID(as_uuid=True), ForeignKey("gyms.id")

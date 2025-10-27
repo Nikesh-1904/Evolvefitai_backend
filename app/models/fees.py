@@ -22,7 +22,7 @@ class MembershipFee(Base):
         pgUUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
     user_id: Mapped[uuid.UUID] = mapped_column(
-        pgUUID(as_uuid=True), ForeignKey("users.id"), nullable=False
+        pgUUID(as_uuid=True), ForeignKey("user.id"), nullable=False
     )
     gym_id: Mapped[uuid.UUID] = mapped_column(
         pgUUID(as_uuid=True), ForeignKey("gyms.id"), nullable=False
