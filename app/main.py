@@ -13,6 +13,7 @@ from app.core.database import create_db_and_tables
 from app.api.v1.api import api_router  # Existing client routes
 from app.business.api import business_router  # Business routes
 from app.shared.api import shared_router  # Shared routes
+from app import models  # Ensure all models are imported for Alembic
 
 # Configure logging
 logging.basicConfig(
