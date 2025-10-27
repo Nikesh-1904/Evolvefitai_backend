@@ -1,7 +1,7 @@
 """merge heads
 
 Revision ID: cc17bc21059c
-Revises: migrate_gyms_id_to_uuid
+Revises: add_business_models
 Create Date: 2025-10-26 00:44:43.296740
 
 """
