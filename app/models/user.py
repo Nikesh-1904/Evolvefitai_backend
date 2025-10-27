@@ -24,7 +24,7 @@ from .base import Base
     
 class User(SQLAlchemyBaseUserTableUUID, Base):    
     """User model with FastAPI Users integration"""
-    __tablename__ = "users"
+    __tablename__ = "user"
 
     username: Mapped[str] = mapped_column(String, unique=True, index=True, nullable=True)
     full_name: Mapped[str] = mapped_column(String, nullable=True)
