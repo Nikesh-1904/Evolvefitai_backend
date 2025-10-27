@@ -65,10 +65,18 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+origins = [
+    "https://evolvefitai-frontend.vercel.app",  # Your frontend
+    "http://localhost:3000",                  # For local development
+]
+
+if isinstance(settings.ALLOWED_ORIGINS, list):
+    origins.extend(settings.ALLOWED_ORIGINS)
+
 # CORS Configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.ALLOWED_ORIGINS,
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
