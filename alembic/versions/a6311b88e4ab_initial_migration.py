@@ -79,7 +79,6 @@ def upgrade() -> None:
     sa.Column('is_superuser', sa.Boolean(), nullable=False),
     sa.Column('is_verified', sa.Boolean(), nullable=False),
     sa.ForeignKeyConstraint(['gym_id'], ['gyms.id'], ),
-    sa.ForeignKeyConstraint(['qr_code_id'], ['user_qr_codes.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_index(op.f('ix_user_email'), 'user', ['email'], unique=True)
@@ -98,6 +97,15 @@ def upgrade() -> None:
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('user_id')
     )
+
+    op.create_foreign_key(
+        'fk_user_qr_code_id_user_qr_codes',  # You can name this constraint
+        'user',                    # Source table (the 'user' table)
+        'user_qr_codes',           # Target table
+        ['qr_code_id'],            # Column in the source table
+        ['id']                     # Column in the target table
+    )
+    
     op.create_table('exercise_tips',
     sa.Column('id', sa.UUID(), nullable=False),
     sa.Column('exercise_id', sa.UUID(), nullable=False),
