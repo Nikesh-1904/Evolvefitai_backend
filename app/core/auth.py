@@ -50,9 +50,12 @@ class CustomUserDatabase(SQLAlchemyUserDatabase[User, uuid.UUID]):
         Fetches a user by ID, eagerly loading oauth_accounts.
         """
         statement = (
-            select(User)  # --- FIX: Use concrete User model
-            .where(User.id == id)  # --- FIX: Use concrete User model
-            .options(selectinload(User.oauth_accounts))  # --- FIX: Use concrete User model
+            select(User)
+            .where(User.id == id)  # type: ignore[arg-type]
+            .options(
+                selectinload(User.oauth_accounts),
+                selectinload(User.achievements)  # <-- THE FIX
+            )
         )
         return await self._get_user(statement)
 
