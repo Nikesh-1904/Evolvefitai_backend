@@ -85,18 +85,16 @@ class CustomUserDatabase(SQLAlchemyUserDatabase[User, uuid.UUID]):
         return user
 
 async def get_user_db(session: AsyncSession = Depends(get_async_session)):
-    # CRITICAL: include OAuthAccount so oauth_account_model exists
     db = CustomUserDatabase(session, User, OAuthAccount)
     print(f"[Auth DI] Constructed {type(db).__name__} from module {__name__}")
-    # Guard: fail fast if somehow not set (should never happen)
     if not hasattr(db, "oauth_account_model"):
+        print(f"[Auth DI] ERROR: oauth_account_model missing on {type(db).__name__} from {__name__}")
         raise RuntimeError("OAuth adapter misconfigured: oauth_account_model missing; ensure CustomUserDatabase(session, User, OAuthAccount) is used and no duplicate core/auth module is imported.")
     yield db
 
 async def get_user_manager(user_db=Depends(get_user_db)):
-    # Debug verification at runtime
-    has_oauth_model = hasattr(user_db, "oauth_account_model")
-    print(f"[Auth DI] user_db type={type(user_db).__name__}, oauth_account_model_present={has_oauth_model}")
+    has_oauth = hasattr(user_db, "oauth_account_model")
+    print(f"[Auth DI] user_db={type(user_db).__name__}, oauth_account_model_present={has_oauth}, provider_module={__name__}")
     yield UserManager(user_db)
 
 def get_jwt_strategy() -> JWTStrategy:
