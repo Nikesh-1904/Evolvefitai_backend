@@ -110,6 +110,25 @@ class CustomUserDatabase(SQLAlchemyUserDatabase[User, uuid.UUID]):
         # which still has its relationships (like achievements) loaded.
         return user
     
+    async def get_by_oauth_account(
+        self, oauth: str, account_id: str
+    ) -> Optional[User]:
+        """
+        Fetches a user by OAuth account, eagerly loading relationships.
+        THIS IS THE MISSING FIX.
+        """
+        statement = (
+            select(User)
+            .join(self.oauth_account_model)
+            .where(self.oauth_account_model.oauth_name == oauth) # type: ignore[arg-type]
+            .where(self.oauth_account_model.account_id == account_id) # type: ignore[arg-type]
+            .options(
+                selectinload(User.oauth_accounts),
+                selectinload(User.achievements)  # Good to keep this here too
+            )
+        )
+        return await self._get_user(statement)
+    
 async def get_user_db(session: AsyncSession = Depends(get_async_session)):
     yield CustomUserDatabase(session, User, OAuthAccount)
 
