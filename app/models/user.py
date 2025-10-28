@@ -105,8 +105,17 @@ class User(SQLAlchemyBaseUserTableUUID, Base):
     performance_records: Mapped[List["MemberPerformance"]] = relationship(
         "MemberPerformance", back_populates="user", cascade="all, delete-orphan"
     )
+    oauth_accounts: Mapped[List["OAuthAccount"]] = relationship(
+        "OAuthAccount", back_populates="user", cascade="all, delete-orphan"
+    )
 
 
 class OAuthAccount(SQLAlchemyBaseOAuthAccountTableUUID, Base):
     """OAuth account for social login"""
-    pass
+    __tablename__ = "oauth_account"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        pgUUID(as_uuid=True), ForeignKey("user.id"), nullable=False
+    )
+
+    user: Mapped["User"] = relationship("User", back_populates="oauth_accounts")
