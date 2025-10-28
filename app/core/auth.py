@@ -85,6 +85,31 @@ class CustomUserDatabase(SQLAlchemyUserDatabase[User, uuid.UUID]):
         await self.session.commit()
         return await self.get(user.id)  # type: ignore 
     
+    async def add_oauth_account(
+        self, user: User, oauth_account_dict: Dict[str, Any]
+    ) -> User:
+        """
+        Adds an OAuth account, but does NOT refresh the user.
+        It returns the user as-is, preserving eager-loaded relationships.
+        This prevents "poisoning" the user object in the session.
+        """
+        # Create and add the new OAuth account
+        oauth_account = self.oauth_account_model(
+            **oauth_account_dict, user_id=user.id
+        )
+        self.session.add(oauth_account)
+        
+        # This .append() is safe because our get/get_by_email
+        # methods already eagerly loaded user.oauth_accounts
+        user.oauth_accounts.append(oauth_account)
+        
+        await self.session.commit()
+        
+        # We explicitly DO NOT call await self.session.refresh(user)
+        # We just return the user object we already have,
+        # which still has its relationships (like achievements) loaded.
+        return user
+    
 async def get_user_db(session: AsyncSession = Depends(get_async_session)):
     yield CustomUserDatabase(session, User, OAuthAccount)
 
