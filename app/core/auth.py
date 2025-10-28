@@ -62,13 +62,16 @@ class CustomUserDatabase(SQLAlchemyUserDatabase[User, uuid.UUID]):
     # --- FIX: Signature now matches the parent class ---
     async def get_by_email(self, email: str) -> Optional[User]:
         """
-        Fetches a user by email, eagerly loading oauth_accounts
-        to prevent async lazy-load errors during linking.
+        Fetches a user by email, eagerly loading relationships
+        needed for login and validation.
         """
         statement = (
-            select(User)  # --- FIX: Use concrete User model
-            .where(User.email == email)  # --- FIX: Use concrete User model
-            .options(selectinload(User.oauth_accounts))  # --- FIX: THE RUNTIME FIX
+            select(User)
+            .where(User.email == email)  # type: ignore[arg-type]
+            .options(
+                selectinload(User.oauth_accounts),
+                selectinload(User.achievements)  # <-- THE FIX
+            )
         )
         return await self._get_user(statement)
 
@@ -80,14 +83,7 @@ class CustomUserDatabase(SQLAlchemyUserDatabase[User, uuid.UUID]):
         user = User(**create_dict)
         self.session.add(user)
         await self.session.commit()
-        
-        # REMOVED: await self.session.refresh(user)
-        # This line was redundant and caused lazy-loading issues.
-        
-        # The .get() will fetch the newly committed user from the DB
-        # with all the eager-loaded relationships.
         return await self.get(user.id)  # type: ignore 
-# --- END NEW CLASS ---
     
 async def get_user_db(session: AsyncSession = Depends(get_async_session)):
     yield CustomUserDatabase(session, User, OAuthAccount)
