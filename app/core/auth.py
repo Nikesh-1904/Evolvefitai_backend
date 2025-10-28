@@ -40,15 +40,17 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
         print(f"User {user.id} logged in.")
 
 class CustomUserDatabase(SQLAlchemyUserDatabase[User, uuid.UUID]):
-    # Eager-load oauth_accounts everywhere a User is fetched
+    # Ensure oauth_account_model exists by constructing with OAuthAccount in get_user_db.
+
+    async def _get_user(self, stmt):
+        result = await self.session.execute(stmt)
+        return result.unique().scalars().first()
 
     async def get(self, id: uuid.UUID) -> Optional[User]:
         stmt = (
             select(User)
             .where(User.id == id)  # type: ignore[arg-type]
-            .options(
-                selectinload(User.oauth_accounts),
-            )
+            .options(selectinload(User.oauth_accounts))
         )
         return await self._get_user(stmt)
 
@@ -56,21 +58,18 @@ class CustomUserDatabase(SQLAlchemyUserDatabase[User, uuid.UUID]):
         stmt = (
             select(User)
             .where(User.email == email)  # type: ignore[arg-type]
-            .options(
-                selectinload(User.oauth_accounts),
-            )
+            .options(selectinload(User.oauth_accounts))
         )
         return await self._get_user(stmt)
 
     async def get_by_oauth_account(self, oauth: str, account_id: str) -> Optional[User]:
+        # Requires self.oauth_account_model to be set by constructor
         stmt = (
             select(User)
-            .join(self.oauth_account_model)
-            .where(self.oauth_account_model.oauth_name == oauth)      # type: ignore[arg-type]
-            .where(self.oauth_account_model.account_id == account_id) # type: ignore[arg-type]
-            .options(
-                selectinload(User.oauth_accounts),
-            )
+            .join(self.oauth_account_model)  # type: ignore[attr-defined]
+            .where(self.oauth_account_model.oauth_name == oauth)      # type: ignore[attr-defined]
+            .where(self.oauth_account_model.account_id == account_id) # type: ignore[attr-defined]
+            .options(selectinload(User.oauth_accounts))
         )
         return await self._get_user(stmt)
 
@@ -78,23 +77,19 @@ class CustomUserDatabase(SQLAlchemyUserDatabase[User, uuid.UUID]):
         user = User(**create_dict)
         self.session.add(user)
         await self.session.commit()
-        # Return with relationship loaded
         return await self.get(user.id)  # type: ignore
 
     async def add_oauth_account(self, user: User, oauth_account_dict: Dict[str, Any]) -> User:
-        # Construct the OAuth account model and link
-        oauth_account = self.oauth_account_model(**oauth_account_dict, user_id=user.id)
+        # Create and associate OAuth account
+        oauth_account = self.oauth_account_model(**oauth_account_dict, user_id=user.id)  # type: ignore[attr-defined]
         self.session.add(oauth_account)
-
-        # Append to the mapped relationship; safe because of eager loading above
+        # Append to relationship; attribute exists because model maps it
         user.oauth_accounts.append(oauth_account)  # type: ignore[attr-defined]
-
         await self.session.commit()
-        # Do not refresh() to avoid losing already loaded relationships
         return user
 
 async def get_user_db(session: AsyncSession = Depends(get_async_session)):
-    # IMPORTANT: include OAuthAccount model here
+    # CRITICAL: pass both models so oauth_account_model is set
     yield CustomUserDatabase(session, User, OAuthAccount)
 
 async def get_user_manager(user_db=Depends(get_user_db)):
@@ -118,9 +113,5 @@ if settings.GOOGLE_CLIENT_ID and settings.GOOGLE_CLIENT_SECRET:
         client_secret=settings.GOOGLE_CLIENT_SECRET,
     )
 
-fastapi_users = FastAPIUsers[User, uuid.UUID](
-    get_user_manager,
-    [auth_backend],
-)
-
+fastapi_users = FastAPIUsers[User, uuid.UUID](get_user_manager, [auth_backend])
 current_active_user = fastapi_users.current_user(active=True)
