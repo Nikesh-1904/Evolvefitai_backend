@@ -72,20 +72,21 @@ class CustomUserDatabase(SQLAlchemyUserDatabase[User, uuid.UUID]):
         )
         return await self._get_user(statement)
 
-    # --- FIX: Signature now matches the parent class ---
     async def create(self, create_dict: Dict[str, Any]) -> User:
         """
         Creates a new user, then immediately fetches them
         with the oauth_accounts relationship loaded.
         """
-        user = User(**create_dict)  # --- FIX: Use concrete User model
+        user = User(**create_dict)
         self.session.add(user)
         await self.session.commit()
-        await self.session.refresh(user)
         
-        # Now, fetch them again, but this time eagerly
-        # loading the relationship so it's ready.
-        return await self.get(user.id)  # type: ignore
+        # REMOVED: await self.session.refresh(user)
+        # This line was redundant and caused lazy-loading issues.
+        
+        # The .get() will fetch the newly committed user from the DB
+        # with all the eager-loaded relationships.
+        return await self.get(user.id)  # type: ignore 
 # --- END NEW CLASS ---
     
 async def get_user_db(session: AsyncSession = Depends(get_async_session)):
