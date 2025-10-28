@@ -87,6 +87,7 @@ class CustomUserDatabase(SQLAlchemyUserDatabase[User, uuid.UUID]):
 async def get_user_db(session: AsyncSession = Depends(get_async_session)):
     # CRITICAL: include OAuthAccount so oauth_account_model exists
     db = CustomUserDatabase(session, User, OAuthAccount)
+    print(f"[Auth DI] Constructed {type(db).__name__} from module {__name__}")
     # Guard: fail fast if somehow not set (should never happen)
     if not hasattr(db, "oauth_account_model"):
         raise RuntimeError("OAuth adapter misconfigured: oauth_account_model missing; ensure CustomUserDatabase(session, User, OAuthAccount) is used and no duplicate core/auth module is imported.")

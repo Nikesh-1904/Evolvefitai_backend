@@ -15,6 +15,10 @@ from app.core.auth import (
 )
 from app.schemas import UserRead, UserCreate, UserUpdate
 
+logger = logging.getLogger(__name__)
+logger.info(f"[Auth Router] get_user_manager imported from {get_user_manager.__module__}")
+
+
 # Set up logging
 logger = logging.getLogger(__name__)
 
@@ -76,7 +80,7 @@ if google_oauth_client:
         user_manager = Depends(get_user_manager),
     ):
         """Handle Google OAuth callback and redirect to frontend with token"""
-        
+        logger.info(f"[Auth Router] google_callback using get_user_manager from {get_user_manager.__module__}")
         if error:
             logger.warning(f"OAuth error received: {error}")
             error_url = f"{settings.CLIENT_FRONTEND_URL}/login?error={error}"
