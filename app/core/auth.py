@@ -40,8 +40,6 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
         print(f"User {user.id} logged in.")
 
 class CustomUserDatabase(SQLAlchemyUserDatabase[User, uuid.UUID]):
-    # Ensure oauth_account_model exists by constructing with OAuthAccount in get_user_db.
-
     async def _get_user(self, stmt):
         result = await self.session.execute(stmt)
         return result.unique().scalars().first()
@@ -63,7 +61,6 @@ class CustomUserDatabase(SQLAlchemyUserDatabase[User, uuid.UUID]):
         return await self._get_user(stmt)
 
     async def get_by_oauth_account(self, oauth: str, account_id: str) -> Optional[User]:
-        # Requires self.oauth_account_model to be set by constructor
         stmt = (
             select(User)
             .join(self.oauth_account_model)  # type: ignore[attr-defined]
@@ -80,10 +77,8 @@ class CustomUserDatabase(SQLAlchemyUserDatabase[User, uuid.UUID]):
         return await self.get(user.id)  # type: ignore
 
     async def add_oauth_account(self, user: User, oauth_account_dict: Dict[str, Any]) -> User:
-        # Create and associate OAuth account
         oauth_account = self.oauth_account_model(**oauth_account_dict, user_id=user.id)  # type: ignore[attr-defined]
         self.session.add(oauth_account)
-        # Append to relationship; attribute exists because model maps it
         user.oauth_accounts.append(oauth_account)  # type: ignore[attr-defined]
         await self.session.commit()
         return user
