@@ -85,11 +85,17 @@ class CustomUserDatabase(SQLAlchemyUserDatabase[User, uuid.UUID]):
         return user
 
 async def get_user_db(session: AsyncSession = Depends(get_async_session)):
-    db = CustomUserDatabase(session, User, OAuthAccount)
+    # Force explicit keyword-based construction to populate oauth_account_model
+    db = CustomUserDatabase(
+        session=session,
+        user_model=User,
+        oauth_account_model=OAuthAccount,
+    )
     print(f"[Auth DI] Constructed {type(db).__name__} from module {__name__}")
+    print(f"[Auth DI] DB class={type(db)}, DB module={db.__class__.__module__}")
+    print(f"[Auth DI] Base SQLAlchemyUserDatabase from {SQLAlchemyUserDatabase.__module__}, MRO={SQLAlchemyUserDatabase.mro()}")
     if not hasattr(db, "oauth_account_model"):
-        print(f"[Auth DI] ERROR: oauth_account_model missing on {type(db).__name__} from {__name__}")
-        raise RuntimeError("OAuth adapter misconfigured: oauth_account_model missing; ensure CustomUserDatabase(session, User, OAuthAccount) is used and no duplicate core/auth module is imported.")
+        raise RuntimeError("OAuth adapter misconfigured even with explicit kwargs; confirm fastapi-users-db-sqlalchemy version and remove duplicate packages in image.")
     yield db
 
 async def get_user_manager(user_db=Depends(get_user_db)):
