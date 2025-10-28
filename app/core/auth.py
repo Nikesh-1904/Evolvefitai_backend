@@ -84,7 +84,7 @@ class CustomUserDatabase(SQLAlchemyUserDatabase[User, uuid.UUID]):
         return user
 
 async def get_user_db(session: AsyncSession = Depends(get_async_session)):
-    # CRITICAL: pass both models so oauth_account_model is set
+    # CRITICAL: include OAuthAccount here so oauth_account_model exists
     yield CustomUserDatabase(session, User, OAuthAccount)
 
 async def get_user_manager(user_db=Depends(get_user_db)):
