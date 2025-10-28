@@ -21,7 +21,6 @@ email-validator==2.3.0
 fastapi==0.120.0
 fastapi-cli==0.0.13
 fastapi-users==15.0.1
-fastapi-users-db-sqlalchemy==15.0.1
 greenlet==3.2.4
 groq==0.33.0
 h11==0.16.0
