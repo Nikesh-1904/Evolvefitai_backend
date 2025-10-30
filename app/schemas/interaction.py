@@ -2,6 +2,7 @@
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 from datetime import datetime, date
+import uuid
 
 class ExerciseTipBase(BaseModel):
     title: str
@@ -10,7 +11,7 @@ class ExerciseTipBase(BaseModel):
 
 
 class ExerciseTip(ExerciseTipBase):
-    id: int
+    id: uuid.UUID
     exercise_id: int
     popularity_score: float
     created_at: datetime
@@ -26,7 +27,7 @@ class ExerciseVideoBase(BaseModel):
 
 
 class ExerciseVideo(ExerciseVideoBase):
-    id: int
+    id: uuid.UUID
     exercise_id: int
     popularity_score: float
     created_at: datetime
@@ -35,12 +36,12 @@ class ExerciseVideo(ExerciseVideoBase):
         from_attributes = True
 
 class TipInteractionCreate(BaseModel):
-    tip_id: int
+    tip_id: uuid.UUID
     interaction_type: str
 
 
 class VideoPreferenceCreate(BaseModel):
-    video_id: int
+    video_id: uuid.UUID
     preference: str
 
 class ExerciseSetData(BaseModel):

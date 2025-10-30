@@ -22,7 +22,7 @@ class GymCreate(GymBase):
 
 
 class Gym(GymBase):
-    id: int
+    id: uuid.UUID
     created_at: datetime
     updated_at: Optional[datetime] = None
     member_count: int = 0
@@ -47,7 +47,7 @@ class GymBookingCreate(GymBookingBase):
 
 
 class GymBooking(GymBookingBase):
-    id: int
+    id: uuid.UUID
     user_id: uuid.UUID
     status: str
     created_at: datetime

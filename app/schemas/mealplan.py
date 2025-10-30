@@ -18,7 +18,7 @@ class MealPlanCreate(MealPlanBase):
 
 
 class MealPlan(MealPlanBase):
-    id: int
+    id: uuid.UUID
     user_id: uuid.UUID
     ai_generated: bool
     ai_model: Optional[str] = None

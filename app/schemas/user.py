@@ -23,7 +23,7 @@ class UserRead(schemas.BaseUser[uuid.UUID]):
     dietary_restrictions: Optional[List[str]] = []
     has_completed_onboarding: bool
     preferences: Optional[Dict[str, Any]] = {}
-    gym_id: Optional[int] = None
+    gym_id: Optional[uuid.UUID] = None
     last_gym_change: Optional[datetime] = None
     is_active: bool
     is_verified: bool

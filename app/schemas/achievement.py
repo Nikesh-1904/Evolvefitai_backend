@@ -9,7 +9,7 @@ class UserAchievementBase(BaseModel):
 
 
 class UserAchievement(UserAchievementBase):
-    id: int
+    id: uuid.UUID
     user_id: uuid.UUID
     unlocked_at: datetime
 

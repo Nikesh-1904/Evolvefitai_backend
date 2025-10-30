@@ -18,6 +18,20 @@ config = context.config
 # Interpret the config file for Python logging.
 fileConfig(config.config_file_name)
 
+from app.core.config import settings
+
+# Get the database URL from our app's settings
+# (which loads from .env or environment variables)
+sync_database_url = settings.DATABASE_URL
+
+# Alembic needs a non-async (sync) database driver.
+# We must replace 'postgresql+asyncpg' with 'postgresql'
+if sync_database_url and sync_database_url.startswith("postgresql+asyncpg"):
+    sync_database_url = sync_database_url.replace("postgresql+asyncpg", "postgresql")
+
+# Set the sqlalchemy.url in Alembic's config object dynamically
+config.set_main_option("sqlalchemy.url", sync_database_url)
+
 # target_metadata used for 'autogenerate'
 target_metadata = Base.metadata
 
