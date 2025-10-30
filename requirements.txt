@@ -17,11 +17,9 @@ cryptography==46.0.3
 distro==1.9.0
 dnspython==2.8.0
 ecdsa==0.19.1
-email-validator==2.0.0
 fastapi==0.103.2
 fastapi-cli==0.0.13
-fastapi-users==10.4.2
-fastapi-users-db-sqlalchemy==7.0.0
+fastapi-users[sqlalchemy]>=13.0.0
 greenlet==3.2.4
 groq==0.33.0
 h11==0.16.0
