@@ -1,5 +1,5 @@
 # app/schemas/mealplan.py
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional, Dict, Any
 from datetime import datetime
 import uuid
@@ -18,11 +18,10 @@ class MealPlanCreate(MealPlanBase):
 
 
 class MealPlan(MealPlanBase):
+    model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
     user_id: uuid.UUID
     ai_generated: bool
     ai_model: Optional[str] = None
     created_at: datetime
 
-    class Config:
-        from_attributes = True

@@ -1,5 +1,5 @@
 # app/schemas/user.py
-from pydantic import EmailStr, validator
+from pydantic import EmailStr, validator , ConfigDict
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 import uuid
@@ -9,6 +9,7 @@ from fastapi_users import schemas
 from .achievement import UserAchievement
 
 class UserRead(schemas.BaseUser[uuid.UUID]):
+    model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
     email: EmailStr
     username: Optional[str] = None
@@ -31,8 +32,7 @@ class UserRead(schemas.BaseUser[uuid.UUID]):
     total_points: int
     level: int
     achievements: List[UserAchievement] = []
-    class Config:
-        from_attributes = True
+    
 
 class UserCreate(schemas.BaseUserCreate):
     email: EmailStr

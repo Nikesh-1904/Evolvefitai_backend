@@ -1,5 +1,5 @@
 # app/schemas/business_fees.py
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional, List
 from datetime import datetime, date
 import uuid
@@ -23,6 +23,7 @@ class MembershipFeeUpdate(BaseModel):
 
 
 class MembershipFeeRead(MembershipFeeBase):
+    model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
     gym_id: uuid.UUID
     status: str
@@ -32,8 +33,6 @@ class MembershipFeeRead(MembershipFeeBase):
     receipt_number: Optional[str] = None
     created_at: datetime
 
-    class Config:
-        from_attributes = True
 
 class BulkFeeCreate(BaseModel):
     user_ids: List[uuid.UUID]

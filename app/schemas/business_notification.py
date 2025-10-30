@@ -1,5 +1,5 @@
 # app/schemas/business_notification.py
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional, List
 from datetime import datetime
 import uuid
@@ -14,6 +14,7 @@ class NotificationCreate(BaseModel):
 
 
 class NotificationRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
     user_id: uuid.UUID
     notification_type: str
@@ -25,8 +26,6 @@ class NotificationRead(BaseModel):
     created_at: datetime
     read_at: Optional[datetime] = None
 
-    class Config:
-        from_attributes = True
 
 
 class NotificationPreferences(BaseModel):

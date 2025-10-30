@@ -67,11 +67,10 @@ class ExerciseCreate(ExerciseBase):
 
 
 class Exercise(ExerciseBase):
+    model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
     created_at: datetime
 
-    class Config:
-        from_attributes = True
 
 class WorkoutPlanBase(BaseModel):
     name: str
@@ -86,6 +85,7 @@ class WorkoutPlanCreate(WorkoutPlanBase):
 
 
 class WorkoutPlan(WorkoutPlanBase):
+    model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
     user_id: uuid.UUID
     ai_generated: bool
@@ -93,8 +93,6 @@ class WorkoutPlan(WorkoutPlanBase):
     is_active: bool
     created_at: datetime
 
-    class Config:
-        from_attributes = True
 
 
 # --- Workout Log Schemas ---
@@ -111,10 +109,9 @@ class WorkoutLogCreate(WorkoutLogBase):
 
 
 class WorkoutLog(WorkoutLogBase):
+    model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
     user_id: uuid.UUID
     workout_plan_id: Optional[int] = None
     workout_date: datetime
-    class Config:
-        from_attributes = True
 

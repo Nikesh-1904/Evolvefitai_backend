@@ -1,5 +1,5 @@
 # app/schemas/gym.py
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 import uuid
@@ -22,14 +22,12 @@ class GymCreate(GymBase):
 
 
 class Gym(GymBase):
+    model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
     created_at: datetime
     updated_at: Optional[datetime] = None
     member_count: int = 0
     gym_code: Optional[str] = None
-
-    class Config:
-        from_attributes = True
 
 
 class JoinByCodeRequest(BaseModel):
@@ -47,14 +45,13 @@ class GymBookingCreate(GymBookingBase):
 
 
 class GymBooking(GymBookingBase):
+    model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
     user_id: uuid.UUID
     status: str
     created_at: datetime
     cancelled_at: Optional[datetime] = None
 
-    class Config:
-        from_attributes = True
 
 
 class GymOccupancyResponse(BaseModel):

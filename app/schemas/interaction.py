@@ -1,5 +1,5 @@
 # app/schemas/interaction.py
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional, List, Dict, Any
 from datetime import datetime, date
 import uuid
@@ -11,14 +11,13 @@ class ExerciseTipBase(BaseModel):
 
 
 class ExerciseTip(ExerciseTipBase):
+    model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
-    exercise_id: int
+    exercise_id: uuid.UUID
     popularity_score: float
     created_at: datetime
 
-    class Config:
-        from_attributes = True
-
+    
 class ExerciseVideoBase(BaseModel):
     youtube_url: str
     title: Optional[str] = None
@@ -27,13 +26,12 @@ class ExerciseVideoBase(BaseModel):
 
 
 class ExerciseVideo(ExerciseVideoBase):
+    model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
     exercise_id: int
     popularity_score: float
     created_at: datetime
 
-    class Config:
-        from_attributes = True
 
 class TipInteractionCreate(BaseModel):
     tip_id: uuid.UUID
