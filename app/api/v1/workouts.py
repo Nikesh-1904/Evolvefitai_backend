@@ -10,6 +10,7 @@ from app.core.database import get_async_session
 from app.core.auth import current_active_user
 from app import models, schemas
 from app.schemas import ExerciseType # 👈 Make sure ExerciseType is imported
+import uuid
 
 
 router = APIRouter()
@@ -30,7 +31,7 @@ async def get_user_workout_plans(
 
 @router.get("/plans/{plan_id}", response_model=schemas.WorkoutPlan)
 async def get_workout_plan_by_id(
-    plan_id: int,
+    plan_id: uuid.UUID,
     current_user: models.User = Depends(current_active_user),
     session: AsyncSession = Depends(get_async_session)
 ):

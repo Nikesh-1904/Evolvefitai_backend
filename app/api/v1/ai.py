@@ -8,7 +8,7 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Dict
 from datetime import datetime, timedelta, timezone
-
+import uuid
 from app.core.database import get_async_session
 from app.core.auth import current_active_user
 from app.core.config import settings

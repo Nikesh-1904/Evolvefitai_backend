@@ -1,5 +1,5 @@
 # app/schemas/workout.py
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional, List, Dict, Any, Union
 from datetime import datetime
 import uuid
