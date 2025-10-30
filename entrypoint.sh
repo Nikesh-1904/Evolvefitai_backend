@@ -17,7 +17,7 @@ if echo "$DATABASE_URL" | grep -q "^postgresql://"; then
 fi
 
 echo "Starting Alembic migrations"
-alembic upgrade head
+# alembic upgrade head
 
 echo "Starting uvicorn"
 echo "Port is set to: $PORT"
