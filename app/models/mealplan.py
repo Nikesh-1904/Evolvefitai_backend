@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 from sqlalchemy import (
-    String, DateTime, Float, ForeignKey, JSON
+    String, Boolean, DateTime, Float, ForeignKey, JSON
 )
 from sqlalchemy.orm import relationship, Mapped, mapped_column
 from sqlalchemy.sql import func
@@ -29,9 +29,13 @@ class MealPlan(Base):
     target_carbs: Mapped[float] = mapped_column(Float, nullable=True)
     target_fat: Mapped[float] = mapped_column(Float, nullable=True)
     meals: Mapped[dict] = mapped_column(JSON)
+    
+    # ✅ FIX: Added missing AI fields
+    ai_generated: Mapped[bool] = mapped_column(Boolean, default=False)
+    ai_model: Mapped[str] = mapped_column(String, nullable=True)
+    
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
 
     user: Mapped["User"] = relationship("User", back_populates="meal_plans")
-

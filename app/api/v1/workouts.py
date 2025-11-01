@@ -1,7 +1,7 @@
 # app/api/v1/workouts.py
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from fastapi import APIRouter, Depends, HTTPException, logger, status
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional
 from datetime import datetime
@@ -130,57 +130,94 @@ async def log_workout(
     """Log a completed workout and calculate calories burned using per-exercise MET values."""
     
     total_calories_burned: float = 0.0
-    user_weight_kg = getattr(current_user, 'weight', 70.0) or 70.0 # Default to 70kg if no weight
+    user_weight_kg = getattr(current_user, 'weight', 70.0) or 70.0
     DEFAULT_MET_VALUE = 3.5
     
     # 1. Loop through each logged exercise to calculate its specific calorie burn.
     for exercise_log in workout_log.exercises_completed:
-        # Find the exercise in our database to get its MET value.
-        result = await session.execute(
-            select(models.Exercise).where(models.Exercise.name.ilike(exercise_log.name))
-        )
-        exercise_db = result.scalars().first()
-        met_value = getattr(exercise_db, 'met_value', DEFAULT_MET_VALUE) or DEFAULT_MET_VALUE
+        # ✅ FIX: Safer database lookup with proper null handling
+        try:
+            result = await session.execute(
+                select(models.Exercise).where(
+                    func.lower(models.Exercise.name) == func.lower(exercise_log.name)
+                )
+            )
+            exercise_db = result.scalars().first()
+            
+            # ✅ FIX: Proper null checking and default value
+            if exercise_db and exercise_db.met_value is not None:
+                met_value = float(exercise_db.met_value)
+            else:
+                met_value = DEFAULT_MET_VALUE
+                logger.warning(
+                    f"No MET value found for exercise '{exercise_log.name}', "
+                    f"using default {DEFAULT_MET_VALUE}"
+                )
+        except Exception as e:
+            logger.error(f"Error fetching exercise '{exercise_log.name}': {e}")
+            met_value = DEFAULT_MET_VALUE
 
         exercise_duration_seconds = 0
         
         # 2. Estimate the duration of the exercise based on its type.
-        if exercise_log.exercise_type in [ExerciseType.DURATION, ExerciseType.DISTANCE_DURATION, ExerciseType.QUALITATIVE]:
+        if exercise_log.exercise_type in [
+            schemas.ExerciseType.DURATION, 
+            schemas.ExerciseType.DISTANCE_DURATION, 
+            schemas.ExerciseType.QUALITATIVE
+        ]:
             # For these types, duration is logged directly.
-            exercise_duration_seconds = sum(s.duration_seconds for s in exercise_log.sets if hasattr(s, 'duration_seconds') and s.duration_seconds)
+            exercise_duration_seconds = sum(
+                getattr(s, 'duration_seconds', 0) 
+                for s in exercise_log.sets 
+                if hasattr(s, 'duration_seconds')
+            )
                   
-        elif exercise_log.exercise_type in [ExerciseType.WEIGHT_BASED, ExerciseType.REPS_ONLY]:
-            # For strength/reps, we estimate duration. A reasonable estimate is ~60 seconds per set (work + rest).
+        elif exercise_log.exercise_type in [
+            schemas.ExerciseType.WEIGHT_BASED, 
+            schemas.ExerciseType.REPS_ONLY
+        ]:
+            # For strength/reps, estimate ~60 seconds per set (work + rest).
             num_sets = len(exercise_log.sets)
             exercise_duration_seconds = num_sets * 60
 
         # 3. Calculate calories for this single exercise and add to the total.
-        duration_hours = exercise_duration_seconds / 3600.0
-        calories_for_exercise = duration_hours * met_value * user_weight_kg
-        total_calories_burned += calories_for_exercise
+        if exercise_duration_seconds > 0:
+            duration_hours = exercise_duration_seconds / 3600.0
+            calories_for_exercise = duration_hours * met_value * user_weight_kg
+            total_calories_burned += calories_for_exercise
 
     # 4. Save the workout log with the accurate total calorie count.
     exercises_completed_as_dicts = [ex.model_dump() for ex in workout_log.exercises_completed]
+    
+    # ✅ FIX: Use workout_date from request or current time
+    workout_date = workout_log.workout_date if workout_log.workout_date else datetime.utcnow()
+    
     db_log = models.WorkoutLog(
         user_id=current_user.id,
         workout_plan_id=workout_log.workout_plan_id,
         exercises_completed=exercises_completed_as_dicts,
         duration_minutes=workout_log.duration_minutes,
-        calories_burned=round(total_calories_burned), # Use our new accurate calculation
+        calories_burned=round(total_calories_burned),
         notes=workout_log.notes,
-        workout_date=workout_log.workout_date or datetime.utcnow()
+        workout_date=workout_date  # ✅ FIX: Now properly set
     )
     session.add(db_log)
     
+    # Calculate points and update user level
     points_earned = math.floor(total_calories_burned / 2)
     
     if points_earned > 0:
         current_user.total_points += points_earned
-        # Recalculate and update the user's level
         current_user.level = calculate_level(current_user.total_points)
     
     await session.commit()
     await session.refresh(db_log)
+    
+    logger.info(
+        f"Workout logged: {db_log.id} for user {current_user.id}, "
+        f"burned {total_calories_burned:.1f} calories, earned {points_earned} points"
+    )
+    
     return db_log
 
 @router.get("/exercises", response_model=List[schemas.Exercise])

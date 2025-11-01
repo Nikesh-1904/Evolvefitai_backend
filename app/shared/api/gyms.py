@@ -334,7 +334,7 @@ async def get_gym_leaderboard(
     # Calculate leaderboard metrics for the last 30 days
     thirty_days_ago = datetime.utcnow() - timedelta(days=30)
     
-    # Complex leaderboard query with workout statistics
+    # ✅ FIX: Corrected query with proper column names
     leaderboard_query = text("""
         SELECT 
             u.id as user_id,
@@ -342,7 +342,7 @@ async def get_gym_leaderboard(
             u.full_name,
             COUNT(wl.id) as total_workouts,
             COALESCE(SUM(wl.calories_burned), 0) as total_calories_burned,
-            COALESCE(SUM(wl.duration_minutes), 0) / 60.0 as total_workout_time_hours,
+            COALESCE(SUM(wl.duration_minutes), 0) as total_minutes,
             (COUNT(DISTINCT DATE(wl.workout_date)) * 100.0 / 30) as consistency_score,
             ROW_NUMBER() OVER (
                 ORDER BY 
@@ -350,7 +350,7 @@ async def get_gym_leaderboard(
                     COALESCE(SUM(wl.calories_burned), 0) DESC,
                     COALESCE(SUM(wl.duration_minutes), 0) DESC
             ) as rank
-        FROM users u
+        FROM "user" u
         LEFT JOIN workout_logs wl ON u.id = wl.user_id 
             AND wl.workout_date >= :thirty_days_ago
         WHERE u.gym_id = :gym_id
@@ -362,7 +362,7 @@ async def get_gym_leaderboard(
     result = await session.execute(
         leaderboard_query,
         {
-            "gym_id": gym_id,
+            "gym_id": str(gym_id),  # ✅ FIX: Convert UUID to string for SQL
             "thirty_days_ago": thirty_days_ago,
             "limit": limit
         }
@@ -380,8 +380,8 @@ async def get_gym_leaderboard(
             user_name=user_name,
             total_workouts=row.total_workouts,
             total_calories_burned=float(row.total_calories_burned),
-            total_minutes=int(row.total_minutes),
-            consistency_score=round(float(row.consistency_score),1),
+            total_minutes=int(row.total_minutes),  # ✅ FIX: Now matches query column
+            consistency_score=round(float(row.consistency_score), 1),
             rank=row.rank
         )
         leaderboard_entries.append(entry)
@@ -394,11 +394,10 @@ async def get_gym_leaderboard(
     return schemas.LeaderboardResponse(
         gym_id=gym.id,
         gym_name=gym.name,
-        gym_address=gym.address, # 👈 ADD ADDRESS HERE
+        gym_address=gym.address,
         leaderboard=leaderboard_entries,
         total_members=total_members
     )
-
 
 @router.get("/leaderboard/my-gym", response_model=Optional[schemas.LeaderboardResponse])
 async def get_my_gym_leaderboard(

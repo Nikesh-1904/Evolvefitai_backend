@@ -41,68 +41,69 @@ async def get_dashboard_overview(
     lifetime_query = (
         select(
             func.count(models.WorkoutLog.id).label("workouts_completed"),
-            func.sum(models.WorkoutLog.calories_burned).label("total_calories_burned")
+            func.coalesce(func.sum(models.WorkoutLog.calories_burned), 0).label("total_calories_burned")
         )
         .where(models.WorkoutLog.user_id == current_user.id)
     )
     lifetime_result = await session.execute(lifetime_query)
-    lifetime_stats = lifetime_result.first()    
+    lifetime_stats = lifetime_result.first()
+    
+    # ✅ FIX: Proper null handling with defaults
+    total_workouts = lifetime_stats.workouts_completed if lifetime_stats else 0
+    total_calories = lifetime_stats.total_calories_burned if lifetime_stats else 0
+    
     # --- Query for TODAY'S stats ---
     today_query = (
         select(
-            func.sum(models.WorkoutLog.duration_minutes).label("duration"),
-            func.sum(models.WorkoutLog.calories_burned).label("calories")
+            func.coalesce(func.sum(models.WorkoutLog.duration_minutes), 0).label("duration"),
+            func.coalesce(func.sum(models.WorkoutLog.calories_burned), 0).label("calories")
         )
         .where(models.WorkoutLog.user_id == current_user.id)
         .where(func.date(models.WorkoutLog.workout_date) == today)
     )
     today_result = await session.execute(today_query)
     today_stats = today_result.first()
-    today_calories = today_stats.calories or 0  # type: ignore
-    today_duration = today_stats.duration or 0  # type: ignore
-
+    
+    # ✅ FIX: Safe access with fallback
+    today_calories = float(today_stats.calories) if today_stats and today_stats.calories else 0.0
+    today_duration = float(today_stats.duration) if today_stats and today_stats.duration else 0.0
 
     # --- Query for YESTERDAY'S stats (for comparison) ---
     yesterday_query = (
         select(
-            func.sum(models.WorkoutLog.duration_minutes).label("duration"),
-            func.sum(models.WorkoutLog.calories_burned).label("calories")
+            func.coalesce(func.sum(models.WorkoutLog.duration_minutes), 0).label("duration"),
+            func.coalesce(func.sum(models.WorkoutLog.calories_burned), 0).label("calories")
         )
         .where(models.WorkoutLog.user_id == current_user.id)
         .where(func.date(models.WorkoutLog.workout_date) == yesterday)
     )
     yesterday_result = await session.execute(yesterday_query)
     yesterday_stats = yesterday_result.first()
-    yesterday_calories = yesterday_stats.calories or 0 # type: ignore
-    yesterday_duration = yesterday_stats.duration or 0 # type: ignore
-
+    
+    # ✅ FIX: Safe access with fallback
+    yesterday_calories = float(yesterday_stats.calories) if yesterday_stats and yesterday_stats.calories else 0.0
+    yesterday_duration = float(yesterday_stats.duration) if yesterday_stats and yesterday_stats.duration else 0.0
 
     # Helper function to calculate percentage change
-    def calculate_change(today_val, yesterday_val):
-        today_val = today_val or 0
-        yesterday_val = yesterday_val or 0
+    def calculate_change(today_val: float, yesterday_val: float) -> float:
         if yesterday_val == 0:
             return 100.0 if today_val > 0 else 0.0
         return ((today_val - yesterday_val) / yesterday_val) * 100
 
-    # Calculate changes using the correct '.calories' and '.duration' attributes
     calories_change = calculate_change(today_calories, yesterday_calories)
     time_change = calculate_change(today_duration, yesterday_duration)
 
-    # ... (Level progress calculation remains the same) ...
+    # Level progress calculation
     current_level = current_user.level
     current_points = current_user.total_points
     
-    # Get current level's min points
     points_for_current_level = levelSystem.get(current_level, {}).get('minPoints', 0)
-    
-    # Get next level's min points (which is the goal for the progress bar)
     next_level_data = levelSystem.get(current_level + 1)
     
     if next_level_data:
         points_for_next_level = next_level_data.get('minPoints', current_points)
     else:
-        # User is at max level, so progress bar is full
+        # User is at max level
         points_for_next_level = levelSystem.get(current_level, {}).get('maxPoints', current_points)
     
     level_progress_data = schemas.LevelProgress(
@@ -112,14 +113,14 @@ async def get_dashboard_overview(
         points_for_next_level=int(points_for_next_level)
     )
 
-    # --- Construct the final response using the correct '.calories' attribute ---
+    # ✅ FIX: Use properly handled values
     return schemas.DashboardOverviewStats(
-        total_calories_burned=int(lifetime_stats.total_calories_burned if lifetime_stats else 0), # TO THIS
+        total_calories_burned=int(total_calories),
         total_workout_time_hours=round(today_duration / 60, 1),
-        workouts_completed=lifetime_stats.workouts_completed if lifetime_stats else 0,
+        workouts_completed=total_workouts,
         level_progress=level_progress_data,
-        calories_change_percent=calories_change,
-        time_change_percent=time_change
+        calories_change_percent=round(calories_change, 1),
+        time_change_percent=round(time_change, 1)
     )
 
 # In stats.py

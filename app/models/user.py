@@ -44,16 +44,27 @@ class User(SQLAlchemyBaseUserTableUUID, Base):
     # Gamification
     total_points: Mapped[int] = mapped_column(Integer, default=0)
     current_level: Mapped[int] = mapped_column(Integer, default=1)
+    
+    # ✅ FIX: Add property for backward compatibility with 'level'
+    @property
+    def level(self) -> int:
+        """Alias for current_level for backward compatibility"""
+        return self.current_level
+    
+    @level.setter
+    def level(self, value: int):
+        """Setter for level property"""
+        self.current_level = value
 
     # Gym affiliation
     gym_id: Mapped[uuid.UUID] = mapped_column(
         pgUUID(as_uuid=True), ForeignKey("gyms.id"), nullable=True
     )
 
-    # 🆕 BUSINESS FEATURES - QR & Membership
-    qr_code_id: Mapped[uuid.UUID] = mapped_column(
-        pgUUID(as_uuid=True), ForeignKey("user_qr_codes.id"), nullable=True
-    )
+    # ✅ FIX: Removed qr_code_id to fix circular dependency
+    # Use qr_code relationship instead
+    # qr_code_id is not needed when we have a one-to-one relationship
+    
     membership_status: Mapped[str] = mapped_column(
         String, default="ACTIVE"  # ACTIVE, EXPIRED, SUSPENDED
     )
@@ -61,14 +72,11 @@ class User(SQLAlchemyBaseUserTableUUID, Base):
         DateTime(timezone=True), nullable=True
     )
     
-    # 🆕 Notification preferences
+    # ✅ FIX: Changed default to use server_default for mutable dict
     notification_preferences: Mapped[dict] = mapped_column(
-        JSON, 
-        default=lambda: {
-            "email_enabled": True,
-            "app_enabled": True,
-            "fee_reminder_days": [7, 3, 1]  # Days before due date
-        }
+        JSON,
+        nullable=False,
+        server_default='{"email_enabled": true, "app_enabled": true, "fee_reminder_days": [7, 3, 1]}'
     )
 
     # Relationships
@@ -89,10 +97,15 @@ class User(SQLAlchemyBaseUserTableUUID, Base):
         "GymBooking", back_populates="user", cascade="all, delete-orphan"
     )
 
-    # 🆕 BUSINESS RELATIONSHIPS
+    # ✅ FIX: Use uselist=False for one-to-one relationship
     qr_code: Mapped[Optional["UserQRCode"]] = relationship(
-        "UserQRCode", back_populates="user", foreign_keys="UserQRCode.user_id", uselist=False
+        "UserQRCode", 
+        back_populates="user", 
+        foreign_keys="UserQRCode.user_id",
+        uselist=False,
+        cascade="all, delete-orphan"
     )
+    
     fee_records: Mapped[List["MembershipFee"]] = relationship(
         "MembershipFee", back_populates="user", cascade="all, delete-orphan"
     )
