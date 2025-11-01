@@ -1,28 +1,87 @@
 #!/bin/sh
 set -e
 
-# Export or rewrite variables for async drivers as before
+echo "========================================"
+echo "EvolveFit AI Backend Starting..."
+echo "========================================"
+
+# ===== 1. DATABASE URL VALIDATION =====
 if [ -z "$DATABASE_URL" ]; then
-  echo "DATABASE_URL not set"
+  echo "❌ ERROR: DATABASE_URL not set"
   exit 1
 fi
 
+echo "✅ DATABASE_URL is set"
+
+# ===== 2. CONVERT DATABASE URL FOR ASYNC DRIVERS =====
+# Save original for Alembic (sync)
+export ALEMBIC_DATABASE_URL="$DATABASE_URL"
+
+# SQLite conversion
 if echo "$DATABASE_URL" | grep -q "^sqlite://"; then
-  export DATABASE_URL=$(echo "$DATABASE_URL" | sed 's#sqlite:///#sqlite+aiosqlite:///#!')
+  export DATABASE_URL=$(echo "$DATABASE_URL" | sed 's#sqlite:///#sqlite+aiosqlite:///#')
+  echo "✅ Converted SQLite URL for async driver"
 fi
 
-# Corrected a typo here from "$DATABASE_L" to "$DATABASE_URL"
+# PostgreSQL conversion (for async runtime)
 if echo "$DATABASE_URL" | grep -q "^postgresql://"; then
-  export DATABASE_URL=$(echo "$DATABASE_URL" | sed 's#postgresql:#postgresql+asyncpg:#')
+  export DATABASE_URL=$(echo "$DATABASE_URL" | sed 's#postgresql://#postgresql+asyncpg://#')
+  echo "✅ Converted PostgreSQL URL for async driver"
 fi
 
-echo "Starting Alembic migrations"
-# alembic upgrade head
+# ===== 3. SKIP MIGRATIONS ON RAILWAY (OPTIONAL) =====
+if [ "$SKIP_MIGRATIONS" = "true" ]; then
+  echo "⏭️  Skipping migrations (SKIP_MIGRATIONS=true)"
+else
+  echo ""
+  echo "========================================"
+  echo "Running Database Migrations..."
+  echo "========================================"
+  
+  # Try migrations with timeout and retry
+  MIGRATION_TIMEOUT=30
+  MIGRATION_RETRIES=3
+  RETRY=0
+  
+  while [ $RETRY -lt $MIGRATION_RETRIES ]; do
+    if timeout $MIGRATION_TIMEOUT alembic upgrade head 2>&1; then
+      echo "✅ Migrations completed successfully"
+      break
+    else
+      RETRY=$((RETRY + 1))
+      if [ $RETRY -lt $MIGRATION_RETRIES ]; then
+        echo "⚠️  Migration attempt $RETRY failed, retrying in 5s..."
+        sleep 5
+      else
+        echo "❌ Migration failed after $MIGRATION_RETRIES attempts"
+        echo ""
+        echo "🔧 TROUBLESHOOTING:"
+        echo "  1. Check DATABASE_URL is correct in Railway"
+        echo "  2. Ensure PostgreSQL service is running"
+        echo "  3. Try setting SKIP_MIGRATIONS=true to start without migrations"
+        echo "  4. You can run migrations manually later with:"
+        echo "     railway run alembic upgrade head"
+        echo ""
+        echo "⚠️  Starting server anyway (migrations will retry on next restart)..."
+      fi
+    fi
+  done
+fi
 
-echo "Starting uvicorn"
-echo "Port is set to: $PORT"
+# ===== 4. START UVICORN SERVER =====
+echo ""
+echo "========================================"
+echo "Starting Uvicorn Server..."
+echo "========================================"
+echo "Port: ${PORT:-8000}"
+echo "Environment: ${RAILWAY_ENVIRONMENT:-development}"
+echo "========================================"
 
-# The --forwarded-allow-ips='*' flag is added to fully trust the proxy,
-# ensuring the application generates the correct https:// callback URL.
-exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --proxy-headers --forwarded-allow-ips='*'
-
+# Start the application with Railway-specific settings
+exec uvicorn app.main:app \
+  --host 0.0.0.0 \
+  --port ${PORT:-8000} \
+  --proxy-headers \
+  --forwarded-allow-ips='*' \
+  --log-level info \
+  --timeout-keep-alive 65
