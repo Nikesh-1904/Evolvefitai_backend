@@ -5,7 +5,7 @@ import uuid
 import qrcode
 import io
 import base64
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone  # ✅ ADDED timezone
 from typing import Optional, Dict, Any
 from cryptography.fernet import Fernet
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -23,14 +23,24 @@ class QRCodeService:
 
     def __init__(self):
         """Initialize QR service with encryption key"""
-        # Generate encryption key if not in settings
-        # In production, this should be in environment variables
+        # ✅ FIX #4: Make encryption key REQUIRED in production
+        if not hasattr(settings, 'QR_ENCRYPTION_KEY') or not settings.QR_ENCRYPTION_KEY:
+            error_msg = (
+                "QR_ENCRYPTION_KEY is required but not set in environment variables.\n"
+                "Generate one with:\n"
+                "  python -c \"from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())\"\n"
+                "Then set it in your .env file or Railway variables:\n"
+                "  QR_ENCRYPTION_KEY=<your-generated-key>"
+            )
+            logger.error(error_msg)
+            raise ValueError(error_msg)
+        
         try:
             self.cipher = Fernet(settings.QR_ENCRYPTION_KEY.encode())
-        except Exception:
-            # Fallback: generate a key (for development only!)
-            logger.warning("QR_ENCRYPTION_KEY not found in settings, generating temporary key")
-            self.cipher = Fernet(Fernet.generate_key())
+            logger.info("✅ QR encryption initialized successfully")
+        except Exception as e:
+            logger.error(f"❌ Failed to initialize QR encryption: {e}")
+            raise ValueError(f"Invalid QR_ENCRYPTION_KEY format: {e}")
 
     def generate_qr_code(
         self, 
@@ -50,8 +60,8 @@ class QRCodeService:
             Dictionary with QR code data and image
         """
         try:
-            # Create payload with timestamp
-            issued_at = datetime.utcnow()
+            # ✅ FIX #2: Use timezone-aware datetime
+            issued_at = datetime.now(timezone.utc)
             expires_at = issued_at + timedelta(days=validity_days)
             
             payload = f"{user_id}:{gym_id}:{issued_at.timestamp()}"
@@ -77,6 +87,8 @@ class QRCodeService:
             img.save(buffer, format='PNG')
             img_base64 = base64.b64encode(buffer.getvalue()).decode()
             
+            logger.info(f"✅ Generated QR code for user {user_id}")
+            
             return {
                 "qr_code_data": encrypted_data,
                 "qr_code_image_base64": img_base64,
@@ -86,7 +98,7 @@ class QRCodeService:
             }
             
         except Exception as e:
-            logger.error(f"Error generating QR code: {str(e)}")
+            logger.error(f"❌ Error generating QR code: {str(e)}")
             raise ValueError(f"Failed to generate QR code: {str(e)}")
 
     def validate_qr_code(self, qr_code_data: str) -> Dict[str, Any]:
@@ -118,12 +130,15 @@ class QRCodeService:
             gym_id = uuid.UUID(gym_id_str)
             issued_timestamp = float(timestamp_str)
             
-            # Check expiry (15 days validity)
-            issued_at = datetime.fromtimestamp(issued_timestamp)
+            # ✅ FIX #2: Use timezone-aware datetime
+            issued_at = datetime.fromtimestamp(issued_timestamp, tz=timezone.utc)
             expires_at = issued_at + timedelta(days=15)
             
-            if datetime.utcnow() > expires_at:
+            # Check expiry
+            if datetime.now(timezone.utc) > expires_at:
                 raise ValueError("QR code has expired")
+            
+            logger.info(f"✅ Valid QR code for user {user_id}")
             
             return {
                 "valid": True,
@@ -134,7 +149,7 @@ class QRCodeService:
             }
             
         except Exception as e:
-            logger.error(f"QR validation failed: {str(e)}")
+            logger.error(f"❌ QR validation failed: {str(e)}")
             return {
                 "valid": False,
                 "error": str(e)
@@ -165,10 +180,13 @@ class QRCodeService:
         )
         existing_qr = result.scalar_one_or_none()
         
+        # ✅ FIX #2: Use timezone-aware datetime
+        current_time = datetime.now(timezone.utc)
+        
         # Check if QR code exists and is still valid
         if existing_qr and existing_qr.is_active:
-            if existing_qr.expires_at and existing_qr.expires_at > datetime.utcnow():
-                logger.info(f"Using existing QR code for user {user_id}")
+            if existing_qr.expires_at and existing_qr.expires_at > current_time:
+                logger.info(f"✅ Using existing QR code for user {user_id}")
                 return existing_qr
         
         # Generate new QR code
@@ -182,7 +200,7 @@ class QRCodeService:
             existing_qr.expires_at = qr_data["expires_at"]
             await session.commit()
             await session.refresh(existing_qr)
-            logger.info(f"Regenerated QR code for user {user_id}")
+            logger.info(f"♻️ Regenerated QR code for user {user_id}")
             return existing_qr
         else:
             # Create new record
@@ -197,7 +215,7 @@ class QRCodeService:
             session.add(new_qr)
             await session.commit()
             await session.refresh(new_qr)
-            logger.info(f"Created new QR code for user {user_id}")
+            logger.info(f"🆕 Created new QR code for user {user_id}")
             return new_qr
 
     async def deactivate_qr_code(
@@ -227,9 +245,10 @@ class QRCodeService:
         if qr_code:
             qr_code.is_active = False
             await session.commit()
-            logger.info(f"Deactivated QR code for user {user_id}")
+            logger.info(f"🔒 Deactivated QR code for user {user_id}")
             return True
         
+        logger.warning(f"⚠️  No QR code found to deactivate for user {user_id}")
         return False
 
 

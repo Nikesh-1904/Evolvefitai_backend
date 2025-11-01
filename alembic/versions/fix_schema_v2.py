@@ -58,16 +58,34 @@ def upgrade() -> None:
     
     # ===== FIX 4: ExerciseVideo - Add missing fields =====
     print("Adding youtube_url and duration to exercise_videos...")
+    
+    # Add video_id column if it doesn't exist (for backward compatibility)
+    try:
+        op.add_column('exercise_videos',
+            sa.Column('video_id', sa.String(), nullable=True)
+        )
+    except Exception:
+        print("video_id column already exists or error adding it")
+    
     # First, add youtube_url as nullable
     op.add_column('exercise_videos',
         sa.Column('youtube_url', sa.String(), nullable=True)
     )
-    # Backfill from video_id (construct URL)
-    op.execute("""
-        UPDATE exercise_videos 
-        SET youtube_url = 'https://www.youtube.com/watch?v=' || video_id 
-        WHERE youtube_url IS NULL
-    """)
+    # Backfill from video_id (construct URL) if video_id exists
+    try:
+        op.execute("""
+            UPDATE exercise_videos 
+            SET youtube_url = 'https://www.youtube.com/watch?v=' || video_id 
+            WHERE youtube_url IS NULL AND video_id IS NOT NULL
+        """)
+    except Exception:
+        # If video_id doesn't exist, just set a default
+        op.execute("""
+            UPDATE exercise_videos 
+            SET youtube_url = 'https://www.youtube.com/watch?v=default'
+            WHERE youtube_url IS NULL
+        """)
+    
     # Make it non-nullable
     op.alter_column('exercise_videos', 'youtube_url', nullable=False)
     

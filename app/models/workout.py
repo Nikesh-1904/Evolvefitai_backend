@@ -112,7 +112,8 @@ class ExerciseVideo(Base):
         pgUUID(as_uuid=True), ForeignKey("exercises.id")
     )
     
-    # ✅ FIX: Added youtube_url field (keep video_id for compatibility)
+    # ✅ FIX: Include both video_id and youtube_url for compatibility
+    video_id: Mapped[str] = mapped_column(String, nullable=False)  # Legacy field for backward compatibility
     youtube_url: Mapped[str] = mapped_column(String, nullable=False)
     
     title: Mapped[str] = mapped_column(String)
