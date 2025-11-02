@@ -25,6 +25,8 @@ python-jose[cryptography]==3.3.0
 # bcrypt and passlib versions will be auto-resolved by fastapi-users
 argon2-cffi==23.1.0
 cryptography==44.0.0
+passlib[bcrypt]==1.7.4  # ✅ Explicitly added
+
 
 # ===== HTTP & NETWORKING =====
 httpx==0.28.1
