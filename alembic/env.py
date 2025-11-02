@@ -19,10 +19,37 @@ config = context.config
 fileConfig(config.config_file_name)
 
 from app.core.config import settings
+import os
 
-# Get the database URL from our app's settings
-# (which loads from .env or environment variables)
-sync_database_url = settings.DATABASE_URL
+# Get the database URL - try multiple sources
+sync_database_url = os.getenv("ALEMBIC_DATABASE_URL") or settings.DATABASE_URL
+
+# CRITICAL: Alembic needs a SYNC database driver
+# Railway/runtime uses async drivers, so we must convert
+
+if sync_database_url:
+    # Convert async PostgreSQL URL to sync
+    if "postgresql+asyncpg://" in sync_database_url:
+        sync_database_url = sync_database_url.replace("postgresql+asyncpg://", "postgresql://")
+        print(f"✅ Converted asyncpg → psycopg2 for Alembic")
+    
+    # Convert async SQLite URL to sync
+    elif "sqlite+aiosqlite://" in sync_database_url:
+        sync_database_url = sync_database_url.replace("sqlite+aiosqlite://", "sqlite:///")
+        print(f"✅ Converted aiosqlite → sqlite3 for Alembic")
+    
+    # If already sync, just confirm
+    elif sync_database_url.startswith("postgresql://"):
+        print(f"✅ Using sync PostgreSQL URL for Alembic")
+    elif sync_database_url.startswith("sqlite:///"):
+        print(f"✅ Using sync SQLite URL for Alembic")
+else:
+    print("❌ ERROR: No DATABASE_URL found!")
+    raise ValueError("DATABASE_URL must be set for migrations")
+
+# Set the sqlalchemy.url in Alembic's config object dynamically
+config.set_main_option("sqlalchemy.url", sync_database_url)
+print(f"📊 Alembic using: {sync_database_url.split('@')[0]}@***")
 
 # Alembic needs a non-async (sync) database driver.
 # We must replace 'postgresql+asyncpg' with 'postgresql'

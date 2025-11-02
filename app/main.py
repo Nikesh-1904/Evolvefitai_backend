@@ -22,6 +22,59 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+import os
+import sys
+
+def validate_environment():
+    """Validate critical environment variables on startup"""
+    print("\n" + "="*60)
+    print("🔍 ENVIRONMENT VALIDATION")
+    print("="*60)
+    
+    # Critical variables that must be set
+    critical_vars = {
+        'DATABASE_URL': os.getenv('DATABASE_URL'),
+        'SECRET_KEY': os.getenv('SECRET_KEY'),
+    }
+    
+    # Optional but recommended
+    optional_vars = {
+        'QR_ENCRYPTION_KEY': os.getenv('QR_ENCRYPTION_KEY'),
+        'GROQ_API_KEY': os.getenv('GROQ_API_KEY'),
+        'GOOGLE_CLIENT_ID': os.getenv('GOOGLE_CLIENT_ID'),
+    }
+    
+    # Check critical variables
+    missing_critical = [var for var, value in critical_vars.items() if not value]
+    
+    if missing_critical:
+        print("❌ CRITICAL ERROR: Missing required environment variables:")
+        for var in missing_critical:
+            print(f"   ✗ {var}")
+        print("\n💡 Fix: Set these variables in Railway dashboard")
+        print("   Go to: Railway Project → Your Service → Variables")
+        sys.exit(1)
+    
+    # Report on all variables
+    print("\n✅ Critical variables:")
+    for var in critical_vars:
+        print(f"   ✓ {var}")
+    
+    print("\n⚙️  Optional variables:")
+    for var, value in optional_vars.items():
+        status = "✓" if value else "✗"
+        print(f"   {status} {var}")
+    
+    # Special warning for QR key
+    if not optional_vars['QR_ENCRYPTION_KEY']:
+        print("\n⚠️  WARNING: QR_ENCRYPTION_KEY not set")
+        print("   QR code check-in features will be disabled")
+        print("   Generate with: python -c \"from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())\"")
+    
+    print("\n" + "="*60 + "\n")
+
+# Call validation
+validate_environment()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

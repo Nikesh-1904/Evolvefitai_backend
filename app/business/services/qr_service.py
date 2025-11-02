@@ -21,27 +21,32 @@ logger = logging.getLogger(__name__)
 class QRCodeService:
     """Service for generating and validating QR codes for gym members"""
 
-    def __init__(self):
-        """Initialize QR service with encryption key"""
-        # ✅ FIX #4: Make encryption key REQUIRED in production
-        if not hasattr(settings, 'QR_ENCRYPTION_KEY') or not settings.QR_ENCRYPTION_KEY:
-            error_msg = (
-                "QR_ENCRYPTION_KEY is required but not set in environment variables.\n"
-                "Generate one with:\n"
-                "  python -c \"from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())\"\n"
-                "Then set it in your .env file or Railway variables:\n"
-                "  QR_ENCRYPTION_KEY=<your-generated-key>"
-            )
-            logger.error(error_msg)
-            raise ValueError(error_msg)
-        
+def __init__(self):
+    """Initialize QR service with encryption key"""
+    self.cipher = None
+    self._encryption_key = getattr(settings, 'QR_ENCRYPTION_KEY', None)
+    
+    # Only initialize cipher if key is provided
+    if self._encryption_key and self._encryption_key.strip():
         try:
-            self.cipher = Fernet(settings.QR_ENCRYPTION_KEY.encode())
+            self.cipher = Fernet(self._encryption_key.encode())
             logger.info("✅ QR encryption initialized successfully")
         except Exception as e:
             logger.error(f"❌ Failed to initialize QR encryption: {e}")
-            raise ValueError(f"Invalid QR_ENCRYPTION_KEY format: {e}")
+            logger.warning("⚠️  QR features will be disabled")
+            self.cipher = None
+    else:
+        logger.warning("⚠️  QR_ENCRYPTION_KEY not set - QR features will be disabled")
 
+    def _ensure_cipher(self):
+        """Ensure cipher is initialized before use"""
+        if self.cipher is None:
+            raise ValueError(
+                "QR_ENCRYPTION_KEY is not configured. "
+                "QR code features are disabled. "
+                "Please set QR_ENCRYPTION_KEY in your environment variables."
+            )
+    
     def generate_qr_code(
         self, 
         user_id: uuid.UUID, 
@@ -59,6 +64,8 @@ class QRCodeService:
         Returns:
             Dictionary with QR code data and image
         """
+        self._ensure_cipher()  # ← ADD THIS LINE AT THE VERY START
+
         try:
             # ✅ FIX #2: Use timezone-aware datetime
             issued_at = datetime.now(timezone.utc)
@@ -114,6 +121,9 @@ class QRCodeService:
         Raises:
             ValueError: If QR code is invalid or expired
         """
+        
+        self._ensure_cipher()  # ← ADD THIS LINE AT THE VERY START
+        
         try:
             # Decrypt data
             decrypted = self.cipher.decrypt(qr_code_data.encode()).decode()
