@@ -98,11 +98,9 @@ class User(SQLAlchemyBaseUserTableUUID, Base):
     )
 
     # ✅ FIX: Use uselist=False for one-to-one relationship
-    qr_code: Mapped[Optional["UserQRCode"]] = relationship(
+    qr_codes: Mapped[Optional["UserQRCode"]] = relationship(
         "UserQRCode", 
         back_populates="user", 
-        foreign_keys="UserQRCode.user_id",
-        uselist=False,
         cascade="all, delete-orphan"
     )
     

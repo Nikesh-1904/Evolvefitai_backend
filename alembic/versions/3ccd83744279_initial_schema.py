@@ -1,18 +1,18 @@
-"""Initial migration
+"""initial_schema
 
-Revision ID: a6311b88e4ab
+Revision ID: 3ccd83744279
 Revises: 
-Create Date: 2025-10-27 23:12:58.345392
+Create Date: 2025-11-02 12:57:11.550105
 
 """
 from typing import Sequence, Union
-import fastapi_users_db_sqlalchemy 
+
 from alembic import op
 import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = 'a6311b88e4ab'
+revision: str = '3ccd83744279'
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -30,7 +30,7 @@ def upgrade() -> None:
     sa.Column('equipment', sa.String(), nullable=True),
     sa.Column('difficulty', sa.String(), nullable=True),
     sa.Column('met_value', sa.Float(), nullable=True),
-    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_index(op.f('ix_exercises_name'), 'exercises', ['name'], unique=True)
@@ -48,10 +48,46 @@ def upgrade() -> None:
     sa.Column('monthly_fee', sa.Float(), nullable=True),
     sa.Column('currency', sa.String(), nullable=False),
     sa.Column('fee_due_day', sa.Integer(), nullable=False),
-    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_index(op.f('ix_gyms_gym_code'), 'gyms', ['gym_code'], unique=True)
+    op.create_table('exercise_tips',
+    sa.Column('id', sa.UUID(), nullable=False),
+    sa.Column('exercise_id', sa.UUID(), nullable=False),
+    sa.Column('title', sa.String(), nullable=False),
+    sa.Column('content', sa.Text(), nullable=False),
+    sa.Column('tip_type', sa.String(), nullable=True),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
+    sa.ForeignKeyConstraint(['exercise_id'], ['exercises.id'], ),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_table('exercise_videos',
+    sa.Column('id', sa.UUID(), nullable=False),
+    sa.Column('exercise_id', sa.UUID(), nullable=False),
+    sa.Column('video_id', sa.String(), nullable=False),
+    sa.Column('youtube_url', sa.String(), nullable=False),
+    sa.Column('title', sa.String(), nullable=False),
+    sa.Column('thumbnail_url', sa.String(), nullable=True),
+    sa.Column('duration', sa.Integer(), nullable=True),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
+    sa.ForeignKeyConstraint(['exercise_id'], ['exercises.id'], ),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_table('gym_owners',
+    sa.Column('id', sa.UUID(), nullable=False),
+    sa.Column('email', sa.String(), nullable=False),
+    sa.Column('hashed_password', sa.String(), nullable=False),
+    sa.Column('full_name', sa.String(), nullable=False),
+    sa.Column('phone_number', sa.String(), nullable=True),
+    sa.Column('gym_id', sa.UUID(), nullable=False),
+    sa.Column('is_active', sa.Boolean(), nullable=False),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
+    sa.Column('last_login', sa.DateTime(timezone=True), nullable=True),
+    sa.ForeignKeyConstraint(['gym_id'], ['gyms.id'], ),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index(op.f('ix_gym_owners_email'), 'gym_owners', ['email'], unique=True)
     op.create_table('user',
     sa.Column('username', sa.String(), nullable=True),
     sa.Column('full_name', sa.String(), nullable=True),
@@ -68,10 +104,9 @@ def upgrade() -> None:
     sa.Column('total_points', sa.Integer(), nullable=False),
     sa.Column('current_level', sa.Integer(), nullable=False),
     sa.Column('gym_id', sa.UUID(), nullable=True),
-    sa.Column('qr_code_id', sa.UUID(), nullable=True),
     sa.Column('membership_status', sa.String(), nullable=False),
     sa.Column('membership_expiry', sa.DateTime(timezone=True), nullable=True),
-    sa.Column('notification_preferences', sa.JSON(), nullable=False),
+    sa.Column('notification_preferences', sa.JSON(), server_default='{"email_enabled": true, "app_enabled": true, "fee_reminder_days": [7, 3, 1]}', nullable=False),
     sa.Column('id', fastapi_users_db_sqlalchemy.generics.GUID(), nullable=False),
     sa.Column('email', sa.String(length=320), nullable=False),
     sa.Column('hashed_password', sa.String(length=1024), nullable=False),
@@ -83,56 +118,15 @@ def upgrade() -> None:
     )
     op.create_index(op.f('ix_user_email'), 'user', ['email'], unique=True)
     op.create_index(op.f('ix_user_username'), 'user', ['username'], unique=True)
-    op.create_table('user_qr_codes',
-    sa.Column('id', sa.UUID(), nullable=False),
-    sa.Column('user_id', sa.UUID(), nullable=False),
-    sa.Column('gym_id', sa.UUID(), nullable=False),
-    sa.Column('qr_code_data', sa.Text(), nullable=False),
-    sa.Column('qr_code_image_base64', sa.Text(), nullable=False),
-    sa.Column('is_active', sa.Boolean(), nullable=False),
-    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.Column('expires_at', sa.DateTime(timezone=True), nullable=True),
-    sa.ForeignKeyConstraint(['gym_id'], ['gyms.id'], ),
-    sa.ForeignKeyConstraint(['user_id'], ['user.id'], ),
-    sa.PrimaryKeyConstraint('id'),
-    sa.UniqueConstraint('user_id')
-    )
-
-    op.create_foreign_key(
-        'fk_user_qr_code_id_user_qr_codes',  # You can name this constraint
-        'user',                    # Source table (the 'user' table)
-        'user_qr_codes',           # Target table
-        ['qr_code_id'],            # Column in the source table
-        ['id']                     # Column in the target table
-    )
-    
-    op.create_table('exercise_tips',
-    sa.Column('id', sa.UUID(), nullable=False),
-    sa.Column('exercise_id', sa.UUID(), nullable=False),
-    sa.Column('tip', sa.Text(), nullable=False),
-    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.ForeignKeyConstraint(['exercise_id'], ['exercises.id'], ),
-    sa.PrimaryKeyConstraint('id')
-    )
-    op.create_table('exercise_videos',
-    sa.Column('id', sa.UUID(), nullable=False),
-    sa.Column('exercise_id', sa.UUID(), nullable=False),
-    sa.Column('video_id', sa.String(), nullable=False),
-    sa.Column('title', sa.String(), nullable=False),
-    sa.Column('thumbnail_url', sa.String(), nullable=True),
-    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.ForeignKeyConstraint(['exercise_id'], ['exercises.id'], ),
-    sa.PrimaryKeyConstraint('id')
-    )
     op.create_table('gym_attendance',
     sa.Column('id', sa.UUID(), nullable=False),
     sa.Column('user_id', sa.UUID(), nullable=False),
     sa.Column('gym_id', sa.UUID(), nullable=False),
-    sa.Column('check_in_time', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('check_in_time', sa.DateTime(timezone=True), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
     sa.Column('check_out_time', sa.DateTime(timezone=True), nullable=True),
     sa.Column('duration_minutes', sa.Integer(), nullable=True),
     sa.Column('qr_code_used', sa.String(), nullable=False),
-    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
     sa.ForeignKeyConstraint(['gym_id'], ['gyms.id'], ),
     sa.ForeignKeyConstraint(['user_id'], ['user.id'], ),
     sa.PrimaryKeyConstraint('id')
@@ -144,25 +138,11 @@ def upgrade() -> None:
     sa.Column('start_time', sa.DateTime(timezone=True), nullable=False),
     sa.Column('end_time', sa.DateTime(timezone=True), nullable=False),
     sa.Column('status', sa.String(), nullable=False),
-    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
     sa.ForeignKeyConstraint(['gym_id'], ['gyms.id'], ),
     sa.ForeignKeyConstraint(['user_id'], ['user.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
-    op.create_table('gym_owners',
-    sa.Column('id', sa.UUID(), nullable=False),
-    sa.Column('email', sa.String(), nullable=False),
-    sa.Column('hashed_password', sa.String(), nullable=False),
-    sa.Column('full_name', sa.String(), nullable=False),
-    sa.Column('phone_number', sa.String(), nullable=True),
-    sa.Column('gym_id', sa.UUID(), nullable=False),
-    sa.Column('is_active', sa.Boolean(), nullable=False),
-    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.Column('last_login', sa.DateTime(timezone=True), nullable=True),
-    sa.ForeignKeyConstraint(['gym_id'], ['gyms.id'], ),
-    sa.PrimaryKeyConstraint('id')
-    )
-    op.create_index(op.f('ix_gym_owners_email'), 'gym_owners', ['email'], unique=True)
     op.create_table('meal_plans',
     sa.Column('id', sa.UUID(), nullable=False),
     sa.Column('user_id', sa.UUID(), nullable=False),
@@ -172,7 +152,9 @@ def upgrade() -> None:
     sa.Column('target_carbs', sa.Float(), nullable=True),
     sa.Column('target_fat', sa.Float(), nullable=True),
     sa.Column('meals', sa.JSON(), nullable=False),
-    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('ai_generated', sa.Boolean(), nullable=False),
+    sa.Column('ai_model', sa.String(), nullable=True),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
     sa.ForeignKeyConstraint(['user_id'], ['user.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
@@ -180,17 +162,39 @@ def upgrade() -> None:
     sa.Column('id', sa.UUID(), nullable=False),
     sa.Column('user_id', sa.UUID(), nullable=False),
     sa.Column('gym_id', sa.UUID(), nullable=False),
-    sa.Column('analysis_date', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('analysis_date', sa.DateTime(timezone=True), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
     sa.Column('total_workouts', sa.Integer(), nullable=False),
     sa.Column('avg_workout_duration', sa.Float(), nullable=False),
     sa.Column('consistency_score', sa.Float(), nullable=False),
     sa.Column('performance_trend', sa.String(), nullable=False),
     sa.Column('weak_areas', sa.JSON(), nullable=False),
     sa.Column('suggestions', sa.JSON(), nullable=False),
-    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
     sa.ForeignKeyConstraint(['gym_id'], ['gyms.id'], ),
     sa.ForeignKeyConstraint(['user_id'], ['user.id'], ),
     sa.PrimaryKeyConstraint('id')
+    )
+    op.create_table('membership_fees',
+    sa.Column('id', sa.UUID(), nullable=False),
+    sa.Column('user_id', sa.UUID(), nullable=False),
+    sa.Column('gym_id', sa.UUID(), nullable=False),
+    sa.Column('amount', sa.Float(), nullable=False),
+    sa.Column('currency', sa.String(), nullable=False),
+    sa.Column('payment_date', sa.DateTime(timezone=True), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
+    sa.Column('due_date', sa.DateTime(timezone=True), nullable=False),
+    sa.Column('paid_date', sa.DateTime(timezone=True), nullable=True),
+    sa.Column('status', sa.String(), nullable=False),
+    sa.Column('payment_method', sa.String(), nullable=True),
+    sa.Column('receipt_number', sa.String(), nullable=True),
+    sa.Column('notes', sa.Text(), nullable=True),
+    sa.Column('created_by', sa.UUID(), nullable=False),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
+    sa.Column('updated_at', sa.DateTime(timezone=True), nullable=True),
+    sa.ForeignKeyConstraint(['created_by'], ['gym_owners.id'], ),
+    sa.ForeignKeyConstraint(['gym_id'], ['gyms.id'], ),
+    sa.ForeignKeyConstraint(['user_id'], ['user.id'], ),
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('receipt_number')
     )
     op.create_table('notifications',
     sa.Column('id', sa.UUID(), nullable=False),
@@ -202,22 +206,22 @@ def upgrade() -> None:
     sa.Column('is_read', sa.Boolean(), nullable=False),
     sa.Column('sent_via_email', sa.Boolean(), nullable=False),
     sa.Column('sent_via_app', sa.Boolean(), nullable=False),
-    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
     sa.Column('read_at', sa.DateTime(timezone=True), nullable=True),
     sa.ForeignKeyConstraint(['gym_id'], ['gyms.id'], ),
     sa.ForeignKeyConstraint(['user_id'], ['user.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_table('oauth_account',
+    sa.Column('user_id', sa.UUID(), nullable=False),
     sa.Column('id', fastapi_users_db_sqlalchemy.generics.GUID(), nullable=False),
-    sa.Column('user_id', fastapi_users_db_sqlalchemy.generics.GUID(), nullable=False),
     sa.Column('oauth_name', sa.String(length=100), nullable=False),
     sa.Column('access_token', sa.String(length=1024), nullable=False),
     sa.Column('expires_at', sa.Integer(), nullable=True),
     sa.Column('refresh_token', sa.String(length=1024), nullable=True),
     sa.Column('account_id', sa.String(length=320), nullable=False),
     sa.Column('account_email', sa.String(length=320), nullable=False),
-    sa.ForeignKeyConstraint(['user_id'], ['user.id'], ondelete='cascade'),
+    sa.ForeignKeyConstraint(['user_id'], ['user.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_index(op.f('ix_oauth_account_account_id'), 'oauth_account', ['account_id'], unique=False)
@@ -226,9 +230,23 @@ def upgrade() -> None:
     sa.Column('id', sa.UUID(), nullable=False),
     sa.Column('user_id', sa.UUID(), nullable=False),
     sa.Column('achievement_id', sa.String(), nullable=False),
-    sa.Column('unlocked_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('unlocked_at', sa.DateTime(timezone=True), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
     sa.ForeignKeyConstraint(['user_id'], ['user.id'], ),
     sa.PrimaryKeyConstraint('id')
+    )
+    op.create_table('user_qr_codes',
+    sa.Column('id', sa.UUID(), nullable=False),
+    sa.Column('user_id', sa.UUID(), nullable=False),
+    sa.Column('gym_id', sa.UUID(), nullable=False),
+    sa.Column('qr_code_data', sa.Text(), nullable=False),
+    sa.Column('qr_code_image_base64', sa.Text(), nullable=False),
+    sa.Column('is_active', sa.Boolean(), nullable=False),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
+    sa.Column('expires_at', sa.DateTime(timezone=True), nullable=True),
+    sa.ForeignKeyConstraint(['gym_id'], ['gyms.id'], ),
+    sa.ForeignKeyConstraint(['user_id'], ['user.id'], ),
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('user_id')
     )
     op.create_table('workout_plans',
     sa.Column('id', sa.UUID(), nullable=False),
@@ -236,34 +254,14 @@ def upgrade() -> None:
     sa.Column('name', sa.String(), nullable=False),
     sa.Column('description', sa.Text(), nullable=True),
     sa.Column('difficulty', sa.String(), nullable=True),
-    sa.Column('duration_minutes', sa.Integer(), nullable=False),
+    sa.Column('estimated_duration', sa.Integer(), nullable=True),
     sa.Column('exercises', sa.JSON(), nullable=False),
     sa.Column('is_active', sa.Boolean(), nullable=False),
-    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('ai_generated', sa.Boolean(), nullable=False),
+    sa.Column('ai_model', sa.String(), nullable=True),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
     sa.ForeignKeyConstraint(['user_id'], ['user.id'], ),
     sa.PrimaryKeyConstraint('id')
-    )
-    op.create_table('membership_fees',
-    sa.Column('id', sa.UUID(), nullable=False),
-    sa.Column('user_id', sa.UUID(), nullable=False),
-    sa.Column('gym_id', sa.UUID(), nullable=False),
-    sa.Column('amount', sa.Float(), nullable=False),
-    sa.Column('currency', sa.String(), nullable=False),
-    sa.Column('payment_date', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.Column('due_date', sa.DateTime(timezone=True), nullable=False),
-    sa.Column('paid_date', sa.DateTime(timezone=True), nullable=True),
-    sa.Column('status', sa.String(), nullable=False),
-    sa.Column('payment_method', sa.String(), nullable=True),
-    sa.Column('receipt_number', sa.String(), nullable=True),
-    sa.Column('notes', sa.Text(), nullable=True),
-    sa.Column('created_by', sa.UUID(), nullable=False),
-    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.Column('updated_at', sa.DateTime(timezone=True), nullable=True),
-    sa.ForeignKeyConstraint(['created_by'], ['gym_owners.id'], ),
-    sa.ForeignKeyConstraint(['gym_id'], ['gyms.id'], ),
-    sa.ForeignKeyConstraint(['user_id'], ['user.id'], ),
-    sa.PrimaryKeyConstraint('id'),
-    sa.UniqueConstraint('receipt_number')
     )
     op.create_table('workout_logs',
     sa.Column('id', sa.UUID(), nullable=False),
@@ -274,7 +272,8 @@ def upgrade() -> None:
     sa.Column('calories_burned', sa.Float(), nullable=True),
     sa.Column('exercises_completed', sa.JSON(), nullable=False),
     sa.Column('notes', sa.Text(), nullable=True),
-    sa.Column('logged_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('workout_date', sa.DateTime(timezone=True), nullable=False),
+    sa.Column('logged_at', sa.DateTime(timezone=True), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
     sa.ForeignKeyConstraint(['user_id'], ['user.id'], ),
     sa.ForeignKeyConstraint(['workout_plan_id'], ['workout_plans.id'], ),
     sa.PrimaryKeyConstraint('id')
@@ -286,25 +285,25 @@ def downgrade() -> None:
     """Downgrade schema."""
     # ### commands auto generated by Alembic - please adjust! ###
     op.drop_table('workout_logs')
-    op.drop_table('membership_fees')
     op.drop_table('workout_plans')
+    op.drop_table('user_qr_codes')
     op.drop_table('user_achievements')
     op.drop_index(op.f('ix_oauth_account_oauth_name'), table_name='oauth_account')
     op.drop_index(op.f('ix_oauth_account_account_id'), table_name='oauth_account')
     op.drop_table('oauth_account')
     op.drop_table('notifications')
+    op.drop_table('membership_fees')
     op.drop_table('member_performance')
     op.drop_table('meal_plans')
-    op.drop_index(op.f('ix_gym_owners_email'), table_name='gym_owners')
-    op.drop_table('gym_owners')
     op.drop_table('gym_bookings')
     op.drop_table('gym_attendance')
-    op.drop_table('exercise_videos')
-    op.drop_table('exercise_tips')
-    op.drop_table('user_qr_codes')
     op.drop_index(op.f('ix_user_username'), table_name='user')
     op.drop_index(op.f('ix_user_email'), table_name='user')
     op.drop_table('user')
+    op.drop_index(op.f('ix_gym_owners_email'), table_name='gym_owners')
+    op.drop_table('gym_owners')
+    op.drop_table('exercise_videos')
+    op.drop_table('exercise_tips')
     op.drop_index(op.f('ix_gyms_gym_code'), table_name='gyms')
     op.drop_table('gyms')
     op.drop_index(op.f('ix_exercises_name'), table_name='exercises')

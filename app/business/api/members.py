@@ -164,9 +164,10 @@ async def remove_member_from_gym(
     user.membership_status = "EXPIRED"
     
     # Deactivate QR code if exists
-    if user.qr_code:
-        user.qr_code.is_active = False
-    
+    if user.qr_codes:
+        for qr_code in user.qr_codes:
+            qr_code.is_active = False
+
     await session.commit()
     
     return {

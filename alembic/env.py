@@ -22,12 +22,19 @@ from app.core.config import settings
 import os
 
 # Get the database URL - try multiple sources
-sync_database_url = os.getenv("ALEMBIC_DATABASE_URL") or settings.DATABASE_URL
+sync_database_url = os.getenv("DATABASE_URL") or os.getenv("ALEMBIC_DATABASE_URL") or settings.DATABASE_URL
 
+print(f"🔍 Checking DATABASE_URL sources...")
+print(f"   os.getenv('DATABASE_URL'): {os.getenv('DATABASE_URL')[:50] if os.getenv('DATABASE_URL') else 'Not set'}")
+print(f"   os.getenv('ALEMBIC_DATABASE_URL'): {os.getenv('ALEMBIC_DATABASE_URL')[:50] if os.getenv('ALEMBIC_DATABASE_URL') else 'Not set'}")
+print(f"   Using: {sync_database_url[:50] if sync_database_url else 'None'}...")
 # CRITICAL: Alembic needs a SYNC database driver
 # Railway/runtime uses async drivers, so we must convert
 
+# CRITICAL: Alembic needs a SYNC database driver
 if sync_database_url:
+    original_url = sync_database_url
+    
     # Convert async PostgreSQL URL to sync
     if "postgresql+asyncpg://" in sync_database_url:
         sync_database_url = sync_database_url.replace("postgresql+asyncpg://", "postgresql://")
@@ -38,14 +45,28 @@ if sync_database_url:
         sync_database_url = sync_database_url.replace("sqlite+aiosqlite://", "sqlite:///")
         print(f"✅ Converted aiosqlite → sqlite3 for Alembic")
     
-    # If already sync, just confirm
+    # Already using sync PostgreSQL
     elif sync_database_url.startswith("postgresql://"):
         print(f"✅ Using sync PostgreSQL URL for Alembic")
+    
+    # Already using sync SQLite
     elif sync_database_url.startswith("sqlite:///"):
         print(f"✅ Using sync SQLite URL for Alembic")
+    
+    # Unknown format - keep as-is
+    else:
+        print(f"⚠️  Unknown database URL format: {sync_database_url[:30]}...")
+    
+    # Show what we're using (hide password)
+    if "@" in sync_database_url:
+        display_url = sync_database_url.split("@")[0] + "@***"
+    else:
+        display_url = sync_database_url[:50]
+    
+    print(f"📊 Alembic using: {display_url}")
 else:
     print("❌ ERROR: No DATABASE_URL found!")
-    raise ValueError("DATABASE_URL must be set for migrations")
+    sys.exit(1)
 
 # Set the sqlalchemy.url in Alembic's config object dynamically
 config.set_main_option("sqlalchemy.url", sync_database_url)

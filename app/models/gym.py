@@ -164,7 +164,7 @@ class UserQRCode(Base):
 
     # Relationships
     user: Mapped["User"] = relationship(
-        "User", back_populates="qr_code", foreign_keys=[user_id]
+        "User", back_populates="qr_codes"
     )
     gym: Mapped["Gym"] = relationship("Gym", back_populates="qr_codes")
 
