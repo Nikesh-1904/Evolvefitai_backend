@@ -1,6 +1,6 @@
-# app/core/auth.py - FIXED VERSION for OAuth
+# app/core/auth.py - FINAL FIX for async context issue
 import uuid
-from typing import Optional, Dict, Any
+from typing import Optional
 
 from fastapi import Depends, Request, Response
 from fastapi_users import BaseUserManager, FastAPIUsers, UUIDIDMixin
@@ -8,8 +8,6 @@ from fastapi_users.authentication import AuthenticationBackend, BearerTransport,
 from fastapi_users.db import SQLAlchemyUserDatabase
 from httpx_oauth.clients.google import GoogleOAuth2
 
-from sqlalchemy import select
-from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -23,13 +21,13 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
     verification_token_secret = SECRET
 
     async def on_after_register(self, user: User, request: Optional[Request] = None):
-        print(f"User {user.id} has registered.")
+        print(f"✅ User {user.id} has registered.")
 
     async def on_after_forgot_password(self, user: User, token: str, request: Optional[Request] = None):
-        print(f"User {user.id} has requested a password reset. Token: {token}")
+        print(f"📧 User {user.id} has requested a password reset. Token: {token}")
 
     async def on_after_request_verify(self, user: User, token: str, request: Optional[Request] = None):
-        print(f"Verification requested for user {user.id}. Token: {token}")
+        print(f"📧 Verification requested for user {user.id}. Token: {token}")
 
     async def on_after_login(
         self,
@@ -37,18 +35,16 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
         request: Optional[Request] = None,
         response: Optional[Response] = None,
     ):
-        print(f"User {user.id} logged in.")
+        print(f"✅ User {user.id} logged in.")
 
 
 async def get_user_db(session: AsyncSession = Depends(get_async_session)):
     """
-    ✅ FIXED: Properly configured for OAuth support
+    Get user database with OAuth support.
     
-    Uses the standard SQLAlchemyUserDatabase with OAuth support.
-    The key is passing the OAuthAccount model as the third parameter.
+    CRITICAL: Must be async and properly yield the database.
+    The session comes from get_async_session which is properly configured.
     """
-    # Create the database adapter with OAuth support
-    # Signature: SQLAlchemyUserDatabase(session, user_model, oauth_account_model)
     yield SQLAlchemyUserDatabase(session, User, OAuthAccount)
 
 
