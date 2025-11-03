@@ -1,4 +1,4 @@
-# app/core/auth.py
+# app/core/auth.py - FIXED VERSION for OAuth
 import uuid
 from typing import Optional, Dict, Any
 
@@ -39,83 +39,52 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
     ):
         print(f"User {user.id} logged in.")
 
-class CustomUserDatabase(SQLAlchemyUserDatabase[User, uuid.UUID]):
-    async def _get_user(self, stmt):
-        result = await self.session.execute(stmt)
-        return result.unique().scalars().first()
-
-    async def get(self, id: uuid.UUID) -> Optional[User]:
-        stmt = (
-            select(User)
-            .where(User.id == id)  # type: ignore[arg-type]
-            .options(selectinload(User.oauth_accounts))
-        )
-        return await self._get_user(stmt)
-
-    async def get_by_email(self, email: str) -> Optional[User]:
-        stmt = (
-            select(User)
-            .where(User.email == email)  # type: ignore[arg-type]
-            .options(selectinload(User.oauth_accounts))
-        )
-        return await self._get_user(stmt)
-
-    async def get_by_oauth_account(self, oauth: str, account_id: str) -> Optional[User]:
-        # Requires self.oauth_account_model; constructor must pass OAuthAccount
-        stmt = (
-            select(User)
-            .join(self.oauth_account_model)  # type: ignore[attr-defined]
-            .where(self.oauth_account_model.oauth_name == oauth)      # type: ignore[attr-defined]
-            .where(self.oauth_account_model.account_id == account_id) # type: ignore[attr-defined]
-            .options(selectinload(User.oauth_accounts))
-        )
-        return await self._get_user(stmt)
-
-    async def create(self, create_dict: Dict[str, Any]) -> User:
-        user = User(**create_dict)
-        self.session.add(user)
-        await self.session.commit()
-        return await self.get(user.id)  # type: ignore
-
-    async def add_oauth_account(self, user: User, oauth_account_dict: Dict[str, Any]) -> User:
-        oauth_account = self.oauth_account_model(**oauth_account_dict, user_id=user.id)  # type: ignore[attr-defined]
-        self.session.add(oauth_account)
-        user.oauth_accounts.append(oauth_account)  # type: ignore[attr-defined]
-        await self.session.commit()
-        return user
 
 async def get_user_db(session: AsyncSession = Depends(get_async_session)):
-    # Use positional arguments: (session, user_model, oauth_account_model)
-    db = CustomUserDatabase(session, User, OAuthAccount)
-    print(f"[Auth DI] Constructed {type(db).__name__} from module {__name__}")
-    print(f"[Auth DI] DB class={type(db)}, DB module={db.__class__.__module__}")
-    print(f"[Auth DI] Base SQLAlchemyUserDatabase from {SQLAlchemyUserDatabase.__module__}, MRO={SQLAlchemyUserDatabase.mro()}")
-    if not hasattr(db, "oauth_account_model"):
-        raise RuntimeError("OAuth adapter misconfigured: oauth_account_model missing; ensure CustomUserDatabase(session, User, OAuthAccount) is used and no duplicate core/auth module is imported.")
-    yield db
+    """
+    ✅ FIXED: Properly configured for OAuth support
+    
+    Uses the standard SQLAlchemyUserDatabase with OAuth support.
+    The key is passing the OAuthAccount model as the third parameter.
+    """
+    # Create the database adapter with OAuth support
+    # Signature: SQLAlchemyUserDatabase(session, user_model, oauth_account_model)
+    yield SQLAlchemyUserDatabase(session, User, OAuthAccount)
 
-async def get_user_manager(user_db=Depends(get_user_db)):
-    has_oauth = hasattr(user_db, "oauth_account_model")
-    print(f"[Auth DI] user_db={type(user_db).__name__}, oauth_account_model_present={has_oauth}, provider_module={__name__}")
+
+async def get_user_manager(user_db: SQLAlchemyUserDatabase = Depends(get_user_db)):
+    """Get the user manager with OAuth support"""
     yield UserManager(user_db)
 
+
 def get_jwt_strategy() -> JWTStrategy:
+    """JWT strategy for authentication"""
     return JWTStrategy(secret=SECRET, lifetime_seconds=3600 * 24)
 
+
+# Bearer token transport
 bearer_transport = BearerTransport(tokenUrl="auth/jwt/login")
 
+# Authentication backend
 auth_backend = AuthenticationBackend(
     name="jwt",
     transport=bearer_transport,
     get_strategy=get_jwt_strategy,
 )
 
+# Google OAuth client (optional)
 google_oauth_client: Optional[GoogleOAuth2] = None
 if settings.GOOGLE_CLIENT_ID and settings.GOOGLE_CLIENT_SECRET:
     google_oauth_client = GoogleOAuth2(
         client_id=settings.GOOGLE_CLIENT_ID,
         client_secret=settings.GOOGLE_CLIENT_SECRET,
     )
+    print("✅ Google OAuth client initialized")
+else:
+    print("⚠️  Google OAuth not configured (missing GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET)")
 
+# FastAPI Users instance
 fastapi_users = FastAPIUsers[User, uuid.UUID](get_user_manager, [auth_backend])
+
+# Current user dependency
 current_active_user = fastapi_users.current_user(active=True)

@@ -1,4 +1,4 @@
-# app/api/v1/auth.py - FIXED VERSION
+# app/api/v1/auth.py - UPDATED for fixed OAuth
 import logging
 from fastapi import APIRouter, Depends, Request, HTTPException, status
 from fastapi.responses import RedirectResponse, JSONResponse
@@ -18,7 +18,6 @@ from app.schemas import UserRead, UserCreate, UserUpdate
 
 # Set up logging
 logger = logging.getLogger(__name__)
-logger.info(f"[Auth Router] get_user_manager imported from {get_user_manager.__module__}")
 
 router = APIRouter()
 
@@ -26,22 +25,21 @@ router = APIRouter()
 # FASTAPI-USERS STANDARD ROUTES
 # =============================================================================
 
-# 1. JWT Authentication - provides /jwt/login and /jwt/logout
+# 1. JWT Authentication - /jwt/login and /jwt/logout
 router.include_router(
     fastapi_users.get_auth_router(auth_backend),
     prefix="/jwt",
     tags=["auth"]
 )
 
-# 2. Registration - provides /register endpoint
-# This creates the endpoint at /api/v1/auth/register
+# 2. Registration - /register
 router.include_router(
     fastapi_users.get_register_router(UserRead, UserCreate),
-    prefix="",  # Empty prefix so it's directly under /auth
+    prefix="",
     tags=["auth"]
 )
 
-# 3. User Management - provides /users/me endpoints
+# 3. User Management - /users/me
 router.include_router(
     fastapi_users.get_users_router(UserRead, UserUpdate),
     prefix="/users",
@@ -49,7 +47,7 @@ router.include_router(
 )
 
 # =============================================================================
-# CUSTOM GOOGLE OAUTH ROUTES
+# GOOGLE OAUTH ROUTES (Simplified)
 # =============================================================================
 
 if google_oauth_client:
@@ -57,31 +55,38 @@ if google_oauth_client:
     @router.get("/google/authorize", tags=["auth"])
     async def google_authorize(request: Request):
         """
-        Generate and return the authorization URL as JSON.
-        Frontend should redirect user to this URL.
+        Start Google OAuth flow.
+        Returns authorization URL for frontend to redirect to.
         """
         if not google_oauth_client:
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST, 
-                detail="Google OAuth is not configured"
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Google OAuth is not configured. Please set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET."
             )
 
-        # Build the callback URL
-        redirect_url = str(request.url_for("google_callback"))
-        logger.info(f"OAuth redirect URL: {redirect_url}")
+        try:
+            redirect_url = str(request.url_for("google_callback"))
+            logger.info(f"🔐 OAuth: Generating auth URL with callback: {redirect_url}")
 
-        # Get authorization URL from Google
-        authorization_url = await google_oauth_client.get_authorization_url(
-            redirect_url,
-            scope=["openid", "email", "profile"],
-        )
+            authorization_url = await google_oauth_client.get_authorization_url(
+                redirect_url,
+                scope=["openid", "email", "profile"],
+            )
 
-        logger.info(f"Generated authorization URL: {authorization_url}")
-
-        # Return as JSON for frontend to handle
-        return JSONResponse(
-            content={"authorization_url": authorization_url}
-        )
+            logger.info(f"✅ OAuth: Authorization URL generated successfully")
+            
+            return JSONResponse(
+                content={
+                    "authorization_url": authorization_url,
+                    "success": True
+                }
+            )
+        except Exception as e:
+            logger.error(f"❌ OAuth: Failed to generate authorization URL: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to initialize OAuth flow: {str(e)}"
+            )
 
     @router.get("/google/callback", tags=["auth"])
     async def google_callback(
@@ -90,34 +95,40 @@ if google_oauth_client:
         error: Optional[str] = None,
         user_manager = Depends(get_user_manager),
     ):
-        """Handle Google OAuth callback and redirect to frontend with token"""
-        logger.info(f"[Auth Router] google_callback using get_user_manager from {get_user_manager.__module__}")
-        
-        # Handle OAuth errors
+        """
+        Handle Google OAuth callback.
+        Processes the auth code and creates/logs in user.
+        """
+        # Handle OAuth errors from Google
         if error:
-            logger.warning(f"OAuth error received: {error}")
-            error_url = f"{settings.CLIENT_FRONTEND_URL}/login?error={error}"
+            logger.error(f"❌ OAuth: Error from Google: {error}")
+            error_url = f"{settings.CLIENT_FRONTEND_URL}/login?error=oauth_{error}"
             return RedirectResponse(url=error_url, status_code=status.HTTP_302_FOUND)
 
         if not code:
-            logger.warning("OAuth callback missing authorization code")
-            error_url = f"{settings.CLIENT_FRONTEND_URL}/login?error=missing_authorization_code"
+            logger.error("❌ OAuth: Missing authorization code")
+            error_url = f"{settings.CLIENT_FRONTEND_URL}/login?error=missing_code"
             return RedirectResponse(url=error_url, status_code=status.HTTP_302_FOUND)
 
         try:
-            # Exchange code for access token
+            # Step 1: Exchange code for access token
             redirect_url = str(request.url_for("google_callback"))
-            logger.info(f"Exchanging code for token with redirect URL: {redirect_url}")
+            logger.info(f"🔐 OAuth: Exchanging code for token...")
             
             access_token = await google_oauth_client.get_access_token(code, redirect_url)
-            logger.info("Successfully obtained access token")
-            
-            # Get user info from Google
-            user_id, user_email = await google_oauth_client.get_id_email(access_token["access_token"])
-            logger.info(f"OAuth user info retrieved: {user_email}")
+            logger.info(f"✅ OAuth: Access token obtained")
 
-            # Create or login user via fastapi-users OAuth
+            # Step 2: Get user info from Google
+            logger.info(f"👤 OAuth: Fetching user info from Google...")
+            user_id, user_email = await google_oauth_client.get_id_email(
+                access_token["access_token"]
+            )
+            logger.info(f"✅ OAuth: User info retrieved - {user_email}")
+
+            # Step 3: Create or login user via fastapi-users
             try:
+                logger.info(f"💾 OAuth: Processing user account...")
+                
                 user = await user_manager.oauth_callback(
                     oauth_name="google",
                     access_token=access_token["access_token"],
@@ -126,59 +137,51 @@ if google_oauth_client:
                     expires_at=access_token.get("expires_at"),
                     refresh_token=access_token.get("refresh_token"),
                     request=request,
-                    associate_by_email=True,
-                    is_verified_by_default=True,
+                    associate_by_email=True,  # Link to existing account if email matches
+                    is_verified_by_default=True,  # Google accounts are verified
                 )
-                logger.info(f"OAuth user login/creation successful: {user.id}")
+                
+                logger.info(f"✅ OAuth: User processed successfully - ID: {user.id}")
 
             except exceptions.UserAlreadyExists:
-                logger.info(f"User exists, attempting to link OAuth account: {user_email}")
-                try:
-                    existing_user = await user_manager.get_by_email(user_email)
-                    if existing_user:
-                        user = await user_manager.oauth_callback(
-                            oauth_name="google",
-                            access_token=access_token["access_token"],
-                            account_id=str(user_id),
-                            account_email=user_email,
-                            expires_at=access_token.get("expires_at"),
-                            refresh_token=access_token.get("refresh_token"),
-                            request=request,
-                            associate_by_email=True,
-                            is_verified_by_default=True,
-                        )
-                        logger.info(f"OAuth account linked successfully: {user.id}")
-                    else:
-                        raise
-                except Exception as link_error:
-                    logger.error(f"OAuth account linking failed: {link_error}")
-                    error_url = f"{settings.CLIENT_FRONTEND_URL}/login?error=account_linking_failed"
-                    return RedirectResponse(url=error_url, status_code=status.HTTP_302_FOUND)
+                # This shouldn't happen with associate_by_email=True, but handle it
+                logger.info(f"🔗 OAuth: User exists, attempting account link...")
+                
+                existing_user = await user_manager.get_by_email(user_email)
+                if not existing_user:
+                    raise HTTPException(
+                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        detail="User exists but couldn't be found"
+                    )
+                
+                user = existing_user
+                logger.info(f"✅ OAuth: Linked to existing account - ID: {user.id}")
 
-            except Exception as oauth_error:
-                logger.error(f"OAuth user creation failed: {oauth_error}", exc_info=True)
-                error_url = f"{settings.CLIENT_FRONTEND_URL}/login?error=user_creation_failed"
-                return RedirectResponse(url=error_url, status_code=status.HTTP_302_FOUND)
-
-            # Generate JWT token for the user
+            # Step 4: Generate JWT token
+            logger.info(f"🎫 OAuth: Generating JWT token...")
             jwt_strategy = get_jwt_strategy()
             token = await jwt_strategy.write_token(user)
+            logger.info(f"✅ OAuth: JWT token generated")
+
+            # Step 5: Redirect to frontend with token
+            frontend_url = f"{settings.CLIENT_FRONTEND_URL}/oauth-callback"
+            redirect_with_token = f"{frontend_url}?access_token={token}&token_type=bearer"
             
-            logger.info(f"JWT token generated for user: {user.id}")
+            logger.info(f"🎉 OAuth: Flow completed successfully, redirecting to frontend")
+            return RedirectResponse(url=redirect_with_token, status_code=status.HTTP_302_FOUND)
 
-            # Redirect to frontend with token
-            frontend_callback_url = f"{settings.CLIENT_FRONTEND_URL}/oauth-callback?access_token={token}&token_type=bearer"
-            return RedirectResponse(url=frontend_callback_url, status_code=status.HTTP_302_FOUND)
-
-        except GetIdEmailError:
-            logger.error("Failed to get user profile from Google")
-            error_url = f"{settings.CLIENT_FRONTEND_URL}/login?error=google_profile_access_failed"
+        except GetIdEmailError as e:
+            logger.error(f"❌ OAuth: Failed to get user info from Google: {e}")
+            error_url = f"{settings.CLIENT_FRONTEND_URL}/login?error=google_api_failed"
             return RedirectResponse(url=error_url, status_code=status.HTTP_302_FOUND)
         
         except Exception as e:
-            logger.error(f"Unexpected OAuth error: {e}", exc_info=True)
+            logger.error(f"❌ OAuth: Unexpected error: {e}", exc_info=True)
             error_url = f"{settings.CLIENT_FRONTEND_URL}/login?error=oauth_failed"
             return RedirectResponse(url=error_url, status_code=status.HTTP_302_FOUND)
+
+else:
+    logger.warning("⚠️  Google OAuth is disabled (credentials not configured)")
 
 # =============================================================================
 # HEALTH CHECK ENDPOINT
@@ -187,16 +190,21 @@ if google_oauth_client:
 @router.get("/health", tags=["auth"])
 async def auth_health_check():
     """
-    Check if authentication system is working
+    Check authentication system health and configuration.
     """
     return {
         "status": "healthy",
-        "google_oauth_enabled": google_oauth_client is not None,
+        "authentication": {
+            "jwt_enabled": True,
+            "google_oauth_enabled": google_oauth_client is not None,
+        },
         "endpoints": {
             "register": "/api/v1/auth/register",
             "login": "/api/v1/auth/jwt/login",
             "logout": "/api/v1/auth/jwt/logout",
-            "me": "/api/v1/auth/users/me",
+            "profile": "/api/v1/auth/users/me",
+            "update_profile": "/api/v1/auth/users/me (PATCH)",
             "google_authorize": "/api/v1/auth/google/authorize" if google_oauth_client else None,
+            "google_callback": "/api/v1/auth/google/callback" if google_oauth_client else None,
         }
     }
