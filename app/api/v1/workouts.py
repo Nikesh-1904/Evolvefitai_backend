@@ -1,19 +1,19 @@
-# app/api/v1/workouts.py
+# app/api/v1/workouts.py - FIXED VERSION
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional
-from datetime import datetime, timezone  # ✅ ADDED timezone
-import math  # ✅ FIX #1: Added missing math import
-import logging  # ✅ FIX #1: Added logging import
+from datetime import datetime, timezone
+import math
+import logging
 from app.core.database import get_async_session
 from app.core.auth import current_active_user
 from app import models, schemas
 from app.schemas import ExerciseType
 import uuid
 
-logger = logging.getLogger(__name__)  # ✅ FIX #1: Initialize logger
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -178,12 +178,36 @@ async def log_workout(
 
     exercises_completed_as_dicts = [ex.model_dump() for ex in workout_log.exercises_completed]
     
-    # ✅ FIX #2: Use timezone-aware datetime
     workout_date = workout_log.workout_date if workout_log.workout_date else datetime.now(timezone.utc)
+    
+    # ✅ FIX: Generate workout name
+    workout_name = None
+    
+    # Try to get name from workout plan if provided
+    if workout_log.workout_plan_id:
+        try:
+            plan = await session.get(models.WorkoutPlan, workout_log.workout_plan_id)
+            if plan:
+                workout_name = plan.name
+        except Exception as e:
+            logger.warning(f"Could not fetch workout plan: {e}")
+    
+    # If no plan or plan not found, generate a descriptive name
+    if not workout_name:
+        if workout_log.exercises_completed and len(workout_log.exercises_completed) > 0:
+            first_exercise = workout_log.exercises_completed[0].name
+            num_exercises = len(workout_log.exercises_completed)
+            if num_exercises == 1:
+                workout_name = f"{first_exercise}"
+            else:
+                workout_name = f"{first_exercise} + {num_exercises - 1} more exercises"
+        else:
+            workout_name = f"Workout - {workout_date.strftime('%B %d, %Y')}"
     
     db_log = models.WorkoutLog(
         user_id=current_user.id,
         workout_plan_id=workout_log.workout_plan_id,
+        name=workout_name,  # ✅ FIX: Always provide a name
         exercises_completed=exercises_completed_as_dicts,
         duration_minutes=workout_log.duration_minutes,
         calories_burned=round(total_calories_burned),
@@ -192,7 +216,6 @@ async def log_workout(
     )
     session.add(db_log)
     
-    # ✅ FIX #1: math.floor now works because math is imported
     points_earned = math.floor(total_calories_burned / 2)
     
     if points_earned > 0:
