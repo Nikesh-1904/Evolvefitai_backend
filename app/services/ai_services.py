@@ -833,7 +833,15 @@ Now, generate the complete JSON object for the user's request.
         return self.rule_based_meals.calculate_tdee(user)
 
     def create_meal_plan_prompt(self, user: models.User, target_calories: int) -> str:
-        diet_restrictions = ", ".join(user.dietary_restrictions) if user.dietary_restrictions else "none"
+        # ✅ FIX: Safely get dietary_restrictions with fallback
+        diet_restrictions = getattr(user, 'dietary_restrictions', None)
+        if diet_restrictions:
+            if isinstance(diet_restrictions, list):
+                diet_restrictions = ", ".join(diet_restrictions)
+            else:
+                diet_restrictions = str(diet_restrictions)
+        else:
+            diet_restrictions = "none"
 
         prompt = f"""Generate a one-day meal plan for a user with the following profile:
             - Fitness Goal: {user.fitness_goal or 'general fitness'}
