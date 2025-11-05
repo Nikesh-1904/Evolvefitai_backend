@@ -1,10 +1,12 @@
-# app/api/v1/auth.py - UPDATED for fixed OAuth
+# app/api/v1/auth.py - FIXED for async OAuth context
 import logging
 from fastapi import APIRouter, Depends, Request, HTTPException, status
 from fastapi.responses import RedirectResponse, JSONResponse
 from fastapi_users import exceptions
 from httpx_oauth.exceptions import GetIdEmailError
 from typing import Optional
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
 from app.core.config import settings
 from app.core.auth import (
@@ -14,7 +16,9 @@ from app.core.auth import (
     get_user_manager,
     get_jwt_strategy,
 )
+from app.core.database import get_async_session
 from app.schemas import UserRead, UserCreate, UserUpdate
+from app import models
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -47,7 +51,7 @@ router.include_router(
 )
 
 # =============================================================================
-# GOOGLE OAUTH ROUTES (Simplified)
+# GOOGLE OAUTH ROUTES (FIXED)
 # =============================================================================
 
 if google_oauth_client:
@@ -94,10 +98,10 @@ if google_oauth_client:
         code: Optional[str] = None,
         error: Optional[str] = None,
         user_manager = Depends(get_user_manager),
+        session: AsyncSession = Depends(get_async_session),  # ✅ FIX: Added session
     ):
         """
-        Handle Google OAuth callback.
-        Processes the auth code and creates/logs in user.
+        Handle Google OAuth callback - FIXED for async context
         """
         # Handle OAuth errors from Google
         if error:
@@ -125,37 +129,70 @@ if google_oauth_client:
             )
             logger.info(f"✅ OAuth: User info retrieved - {user_email}")
 
-            # Step 3: Create or login user via fastapi-users
-            try:
-                logger.info(f"💾 OAuth: Processing user account...")
+            # ✅ FIX: Step 3: Manual user handling with proper async context
+            logger.info(f"💾 OAuth: Processing user account...")
+            
+            # Check if user exists
+            result = await session.execute(
+                select(models.User).where(models.User.email == user_email)
+            )
+            existing_user = result.scalar_one_or_none()
+            
+            if existing_user:
+                # User exists, just use them
+                user = existing_user
+                logger.info(f"✅ OAuth: Existing user found - ID: {user.id}")
                 
-                user = await user_manager.oauth_callback(
+                # Check if OAuth account exists
+                oauth_result = await session.execute(
+                    select(models.OAuthAccount).where(
+                        models.OAuthAccount.user_id == user.id,
+                        models.OAuthAccount.oauth_name == "google"
+                    )
+                )
+                oauth_account = oauth_result.scalar_one_or_none()
+                
+                if not oauth_account:
+                    # Link OAuth account to existing user
+                    oauth_account = models.OAuthAccount(
+                        user_id=user.id,
+                        oauth_name="google",
+                        access_token=access_token["access_token"],
+                        account_id=str(user_id),
+                        account_email=user_email,
+                        expires_at=access_token.get("expires_at"),
+                        refresh_token=access_token.get("refresh_token")
+                    )
+                    session.add(oauth_account)
+                    await session.commit()
+                    logger.info(f"🔗 OAuth: Linked OAuth account to existing user")
+                
+            else:
+                # Create new user
+                user = models.User(
+                    email=user_email,
+                    hashed_password="",  # OAuth users don't have passwords
+                    is_active=True,
+                    is_verified=True,  # Google accounts are verified
+                    is_superuser=False
+                )
+                session.add(user)
+                await session.flush()  # Get user.id
+                
+                # Create OAuth account
+                oauth_account = models.OAuthAccount(
+                    user_id=user.id,
                     oauth_name="google",
                     access_token=access_token["access_token"],
                     account_id=str(user_id),
                     account_email=user_email,
                     expires_at=access_token.get("expires_at"),
-                    refresh_token=access_token.get("refresh_token"),
-                    request=request,
-                    associate_by_email=True,  # Link to existing account if email matches
-                    is_verified_by_default=True,  # Google accounts are verified
+                    refresh_token=access_token.get("refresh_token")
                 )
-                
-                logger.info(f"✅ OAuth: User processed successfully - ID: {user.id}")
-
-            except exceptions.UserAlreadyExists:
-                # This shouldn't happen with associate_by_email=True, but handle it
-                logger.info(f"🔗 OAuth: User exists, attempting account link...")
-                
-                existing_user = await user_manager.get_by_email(user_email)
-                if not existing_user:
-                    raise HTTPException(
-                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                        detail="User exists but couldn't be found"
-                    )
-                
-                user = existing_user
-                logger.info(f"✅ OAuth: Linked to existing account - ID: {user.id}")
+                session.add(oauth_account)
+                await session.commit()
+                await session.refresh(user)
+                logger.info(f"✅ OAuth: Created new user - ID: {user.id}")
 
             # Step 4: Generate JWT token
             logger.info(f"🎫 OAuth: Generating JWT token...")

@@ -1,5 +1,5 @@
 # app/schemas/user.py
-from pydantic import EmailStr, validator , ConfigDict
+from pydantic import EmailStr, validator, ConfigDict
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 import uuid
@@ -9,7 +9,12 @@ from fastapi_users import schemas
 from .achievement import UserAchievement
 
 class UserRead(schemas.BaseUser[uuid.UUID]):
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(
+        from_attributes=True,
+        # ✅ FIX: Don't validate on assignment to avoid eager loading issues
+        validate_assignment=False
+    )
+    
     id: uuid.UUID
     email: EmailStr
     username: Optional[str] = None
@@ -28,9 +33,11 @@ class UserRead(schemas.BaseUser[uuid.UUID]):
     last_gym_change: Optional[datetime] = None
     is_active: bool
     is_verified: bool
-    created_at: datetime
+    created_at: datetime  # ✅ FIX: Added this required field
     total_points: int
     level: int
+    
+    # ✅ FIX: Make achievements optional with default
     achievements: List[UserAchievement] = []
     
 

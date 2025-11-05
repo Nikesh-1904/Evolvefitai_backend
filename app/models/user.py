@@ -6,6 +6,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import relationship, Mapped, mapped_column
 from sqlalchemy.dialects.postgresql import UUID as pgUUID
+from sqlalchemy.sql import func
 from fastapi_users.db import (
     SQLAlchemyBaseUserTableUUID,
     SQLAlchemyBaseOAuthAccountTableUUID,
@@ -56,14 +57,15 @@ class User(SQLAlchemyBaseUserTableUUID, Base):
         """Setter for level property"""
         self.current_level = value
 
+    # ✅ FIX: Add created_at timestamp
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
     # Gym affiliation
     gym_id: Mapped[uuid.UUID] = mapped_column(
         pgUUID(as_uuid=True), ForeignKey("gyms.id"), nullable=True
     )
-
-    # ✅ FIX: Removed qr_code_id to fix circular dependency
-    # Use qr_code relationship instead
-    # qr_code_id is not needed when we have a one-to-one relationship
     
     membership_status: Mapped[str] = mapped_column(
         String, default="ACTIVE"  # ACTIVE, EXPIRED, SUSPENDED
@@ -79,45 +81,78 @@ class User(SQLAlchemyBaseUserTableUUID, Base):
         server_default='{"email_enabled": true, "app_enabled": true, "fee_reminder_days": [7, 3, 1]}'
     )
 
-    # Relationships
-    gym: Mapped["Gym"] = relationship("Gym", back_populates="members", foreign_keys=[gym_id])
+    # ✅ FIX: Relationships with lazy='selectin' for async compatibility
+    gym: Mapped["Gym"] = relationship(
+        "Gym", 
+        back_populates="members", 
+        foreign_keys=[gym_id],
+        lazy="selectin"
+    )
     workout_plans: Mapped[List["WorkoutPlan"]] = relationship(
-        "WorkoutPlan", back_populates="user", cascade="all, delete-orphan"
+        "WorkoutPlan", 
+        back_populates="user", 
+        cascade="all, delete-orphan",
+        lazy="selectin"
     )
     workout_logs: Mapped[List["WorkoutLog"]] = relationship(
-        "WorkoutLog", back_populates="user", cascade="all, delete-orphan"
+        "WorkoutLog", 
+        back_populates="user", 
+        cascade="all, delete-orphan",
+        lazy="selectin"
     )
     meal_plans: Mapped[List["MealPlan"]] = relationship(
-        "MealPlan", back_populates="user", cascade="all, delete-orphan"
+        "MealPlan", 
+        back_populates="user", 
+        cascade="all, delete-orphan",
+        lazy="selectin"
     )
     achievements: Mapped[List["UserAchievement"]] = relationship(
-        "UserAchievement", back_populates="user", cascade="all, delete-orphan"
+        "UserAchievement", 
+        back_populates="user", 
+        cascade="all, delete-orphan",
+        lazy="selectin"  # ✅ FIX: Changed from default to selectin
     )
     bookings: Mapped[List["GymBooking"]] = relationship(
-        "GymBooking", back_populates="user", cascade="all, delete-orphan"
+        "GymBooking", 
+        back_populates="user", 
+        cascade="all, delete-orphan",
+        lazy="selectin"
     )
-
-    # ✅ FIX: Use uselist=False for one-to-one relationship
     qr_codes: Mapped[Optional["UserQRCode"]] = relationship(
         "UserQRCode", 
         back_populates="user", 
-        cascade="all, delete-orphan"
+        cascade="all, delete-orphan",
+        lazy="selectin"
     )
-    
     fee_records: Mapped[List["MembershipFee"]] = relationship(
-        "MembershipFee", back_populates="user", cascade="all, delete-orphan"
+        "MembershipFee", 
+        back_populates="user", 
+        cascade="all, delete-orphan",
+        lazy="selectin"
     )
     attendance_records: Mapped[List["GymAttendance"]] = relationship(
-        "GymAttendance", back_populates="user", cascade="all, delete-orphan"
+        "GymAttendance", 
+        back_populates="user", 
+        cascade="all, delete-orphan",
+        lazy="selectin"
     )
     notifications: Mapped[List["Notification"]] = relationship(
-        "Notification", back_populates="user", cascade="all, delete-orphan"
+        "Notification", 
+        back_populates="user", 
+        cascade="all, delete-orphan",
+        lazy="selectin"
     )
     performance_records: Mapped[List["MemberPerformance"]] = relationship(
-        "MemberPerformance", back_populates="user", cascade="all, delete-orphan"
+        "MemberPerformance", 
+        back_populates="user", 
+        cascade="all, delete-orphan",
+        lazy="selectin"
     )
     oauth_accounts: Mapped[List["OAuthAccount"]] = relationship(
-        "OAuthAccount", back_populates="user", cascade="all, delete-orphan"
+        "OAuthAccount", 
+        back_populates="user", 
+        cascade="all, delete-orphan",
+        lazy="selectin"
     )
 
 
