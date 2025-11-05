@@ -37,6 +37,7 @@ class User(SQLAlchemyBaseUserTableUUID, Base):
     fitness_goal: Mapped[str] = mapped_column(String, nullable=True)
     activity_level: Mapped[str] = mapped_column(String, nullable=True)
     dietary_preference: Mapped[str] = mapped_column(String, nullable=True)
+    dietary_restrictions: Mapped[list] = mapped_column(JSON, nullable=True, default=list)  # ✅ NEW FIELD
 
     # Onboarding
     has_completed_onboarding: Mapped[bool] = mapped_column(Boolean, default=False)
