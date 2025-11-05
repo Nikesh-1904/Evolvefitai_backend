@@ -1,5 +1,5 @@
-# app/schemas/workout.py
-from pydantic import BaseModel, ConfigDict
+# app/schemas/workout.py - FIXED with optional exercise_type and better validation
+from pydantic import BaseModel, ConfigDict, field_validator
 from typing import Optional, List, Dict, Any, Union
 from datetime import datetime
 import uuid
@@ -47,11 +47,25 @@ AnyLoggedSet = Union[
 ]
 
 
-# 4. Update LoggedExercise to use the new Union type and require the exercise_type
+# 4. Updated LoggedExercise with optional exercise_type and validation
 class LoggedExercise(BaseModel):
     name: str
-    exercise_type: Optional[ExerciseType] = None
+    exercise_type: Optional[ExerciseType] = ExerciseType.WEIGHT_BASED  # ✅ FIX: Optional with default
     sets: List[AnyLoggedSet]
+    
+    @field_validator('exercise_type', mode='before')
+    @classmethod
+    def validate_exercise_type(cls, v):
+        """Convert string to enum if needed, provide default if None"""
+        if v is None:
+            return ExerciseType.WEIGHT_BASED
+        if isinstance(v, str):
+            try:
+                return ExerciseType(v)
+            except ValueError:
+                # If invalid string, default to WEIGHT_BASED
+                return ExerciseType.WEIGHT_BASED
+        return v
 
 class ExerciseBase(BaseModel):
     name: str
@@ -105,7 +119,7 @@ class WorkoutLogBase(BaseModel):
 
 class WorkoutLogCreate(WorkoutLogBase):
     workout_plan_id: Optional[int] = None
-    workout_date: Optional[datetime] = None
+    workout_date: Optional[datetime] = None  # ✅ FIX: Made optional, will default to now
 
 
 class WorkoutLog(WorkoutLogBase):
@@ -114,4 +128,3 @@ class WorkoutLog(WorkoutLogBase):
     user_id: uuid.UUID
     workout_plan_id: Optional[int] = None
     workout_date: datetime
-

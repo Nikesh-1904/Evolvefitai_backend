@@ -1,7 +1,9 @@
 # app/main.py
 """FastAPI application entry point"""
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import logging
@@ -196,4 +198,47 @@ if __name__ == "__main__":
         host="0.0.0.0",
         port=8000,
         reload=settings.DEBUG
+    )
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """
+    Enhanced validation error handler that logs the actual error details
+    """
+    # Get the request body for debugging
+    body = None
+    try:
+        body = await request.body()
+        body_str = body.decode('utf-8')
+    except:
+        body_str = "Could not decode body"
+    
+    # Log detailed error information
+    logger.error("=" * 80)
+    logger.error("🚨 VALIDATION ERROR")
+    logger.error(f"📍 Endpoint: {request.method} {request.url.path}")
+    logger.error(f"📦 Request Body: {body_str}")
+    logger.error(f"❌ Validation Errors:")
+    for error in exc.errors():
+        logger.error(f"   - Field: {error.get('loc')}")
+        logger.error(f"     Type: {error.get('type')}")
+        logger.error(f"     Message: {error.get('msg')}")
+        logger.error(f"     Input: {error.get('input')}")
+    logger.error("=" * 80)
+    
+    # Return user-friendly error response
+    return JSONResponse(
+        status_code=422,
+        content={
+            "detail": exc.errors(),
+            "message": "Validation failed. Please check your request data.",
+            "errors": [
+                {
+                    "field": ".".join(str(loc) for loc in error.get("loc", [])),
+                    "message": error.get("msg", ""),
+                    "type": error.get("type", "")
+                }
+                for error in exc.errors()
+            ]
+        }
     )
