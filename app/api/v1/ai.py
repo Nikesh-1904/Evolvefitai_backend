@@ -727,7 +727,7 @@ async def recommend_workout(
     # Add necessary fields expected by the schema but not returned by generator
     # Ensure all required fields for WorkoutPlan schema are present
     workout_data_validated = {
-        "id": 0, # Dummy ID as it's not saved
+        "id": uuid.uuid4(), # Generate a temporary UUID for the recommendation
         "user_id": current_user.id,
         "name": workout_data.get("name", f"Recommended Workout for {', '.join(target_muscles)}"),
         "description": workout_data.get("description", f"AI recommended workout focusing on {', '.join(target_muscles)}."),

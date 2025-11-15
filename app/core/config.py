@@ -39,7 +39,8 @@ class Settings(BaseSettings):
         "http://localhost:3000",
         "http://localhost:5173",
         "https://evolvefit-ai.vercel.app",
-        "https://evolvefit-business.vercel.app"
+        "https://evolvefit-business.vercel.app",
+        "https://evolvefitai-frontend.vercel.app",  # Current production frontend
     ]
     
     # AI Services (will be read from env vars)
