@@ -308,8 +308,23 @@ async def create_booking(
     session.add(booking)
     await session.commit()
     await session.refresh(booking)
-    
+
     return booking
+
+@router.get("/leaderboard/my-gym", response_model=Optional[schemas.LeaderboardResponse])
+async def get_my_gym_leaderboard(
+    limit: int = Query(10, ge=1, le=50),
+    session: AsyncSession = Depends(get_async_session),
+    current_user: models.User = Depends(current_active_user)
+):
+    """Get leaderboard for current user's gym"""
+    if not current_user.gym_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You are not affiliated with any gym"
+        )
+
+    return await get_gym_leaderboard(current_user.gym_id, limit, session, current_user)
 
 @router.get("/leaderboard/{gym_id}", response_model=schemas.LeaderboardResponse)
 async def get_gym_leaderboard(
@@ -398,21 +413,6 @@ async def get_gym_leaderboard(
         leaderboard=leaderboard_entries,
         total_members=total_members
     )
-
-@router.get("/leaderboard/my-gym", response_model=Optional[schemas.LeaderboardResponse])
-async def get_my_gym_leaderboard(
-    limit: int = Query(10, ge=1, le=50),
-    session: AsyncSession = Depends(get_async_session),
-    current_user: models.User = Depends(current_active_user)
-):
-    """Get leaderboard for current user's gym"""
-    if not current_user.gym_id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="You are not affiliated with any gym"
-        )
-    
-    return await get_gym_leaderboard(current_user.gym_id, limit, session, current_user)
 
 @router.post("/join-by-code", response_model=schemas.MessageResponse)
 async def join_gym_by_code(
