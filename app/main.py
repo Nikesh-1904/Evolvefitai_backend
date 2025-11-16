@@ -121,8 +121,9 @@ app = FastAPI(
 )
 
 origins = [
-    "https://evolvefitai-frontend.vercel.app",  # Your frontend
-    "http://localhost:3000",                  # For local development
+    "https://evolvefitai-frontend.vercel.app",  # Client frontend
+    "https://evolvefitai-business.vercel.app",  # Business dashboard
+    "http://localhost:3000",                    # For local development
 ]
 
 if isinstance(settings.ALLOWED_ORIGINS, list):
