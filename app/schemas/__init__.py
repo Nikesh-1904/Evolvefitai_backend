@@ -47,6 +47,7 @@ from .misc import MessageResponse, METValueResponse, LevelProgress, TimeSeriesDa
 from .business_owner import (
     GymOwnerBase, GymOwnerCreate, GymOwnerRead, GymOwnerLogin, GymOwnerUpdate
 )
+from .gym_registration import GymWithOwnerCreate, GymRegistrationResponse
 from .business_qr import QRCodeResponse
 from .business_fees import (
     MembershipFeeBase, MembershipFeeCreate, MembershipFeeUpdate,
@@ -95,6 +96,7 @@ __all__ = [
     "MessageResponse", "METValueResponse", "LevelProgress", "TimeSeriesDataPoint",
     # Business Owner
     "GymOwnerBase", "GymOwnerCreate", "GymOwnerRead", "GymOwnerLogin", "GymOwnerUpdate",
+    "GymWithOwnerCreate", "GymRegistrationResponse",
     # Business QR
     "QRCodeResponse",
     # Business Fees

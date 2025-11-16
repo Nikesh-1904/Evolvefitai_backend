@@ -4,6 +4,8 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import timedelta
+import random
+import string
 
 from app.core.database import get_async_session
 from app.core.business_auth import (
@@ -17,7 +19,104 @@ from app import models, schemas
 router = APIRouter()
 
 
-@router.post("/register", response_model=schemas.GymOwnerRead, status_code=status.HTTP_201_CREATED)
+def generate_gym_code(length=6):
+    """Generate a unique gym code"""
+    return ''.join(random.choices(string.ascii_uppercase + string.digits, k=length))
+
+
+@router.post("/register", status_code=status.HTTP_201_CREATED)
+async def register_gym_with_owner(
+    registration_data: schemas.GymWithOwnerCreate,
+    session: AsyncSession = Depends(get_async_session)
+):
+    """
+    Register a new gym with its owner (Combined Registration)
+
+    Creates both:
+    1. A new Gym record
+    2. A GymOwner account linked to that gym
+
+    Returns JWT token for immediate login
+
+    - **gym_name**: Name of the gym
+    - **address**: Gym address
+    - **phone**: Gym phone number
+    - **owner_name**: Owner's full name
+    - **email**: Owner's email (must be unique)
+    - **password**: Account password
+    """
+    # Check if email already exists
+    existing = await session.execute(
+        models.select(models.GymOwner).where(models.GymOwner.email == registration_data.email)
+    )
+    if existing.scalar_one_or_none():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email already registered"
+        )
+
+    # Generate unique gym code
+    gym_code = generate_gym_code()
+    # Ensure uniqueness
+    while True:
+        check_code = await session.execute(
+            models.select(models.Gym).where(models.Gym.gym_code == gym_code)
+        )
+        if not check_code.scalar_one_or_none():
+            break
+        gym_code = generate_gym_code()
+
+    # Create gym
+    new_gym = models.Gym(
+        name=registration_data.gym_name,
+        address=registration_data.address,
+        gym_code=gym_code,
+        capacity=50  # Default capacity
+    )
+    session.add(new_gym)
+    await session.flush()  # Get gym.id without committing
+
+    # Create gym owner
+    hashed_password = get_password_hash(registration_data.password)
+    new_owner = models.GymOwner(
+        email=registration_data.email,
+        hashed_password=hashed_password,
+        full_name=registration_data.owner_name,
+        phone_number=registration_data.phone,
+        gym_id=new_gym.id,
+        is_active=True
+    )
+
+    session.add(new_owner)
+    await session.commit()
+    await session.refresh(new_owner)
+    await session.refresh(new_gym)
+
+    # Create access token
+    access_token_expires = timedelta(hours=24)
+    access_token = create_access_token(
+        data={"sub": str(new_owner.id), "gym_id": str(new_gym.id)},
+        expires_delta=access_token_expires
+    )
+
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "user": {
+            "id": str(new_owner.id),
+            "email": new_owner.email,
+            "owner_name": new_owner.full_name,
+            "gym_name": new_gym.name,
+            "gym_id": str(new_gym.id),
+            "gym_code": new_gym.gym_code,
+            "phone": new_owner.phone_number,
+            "address": new_gym.address,
+            "is_active": new_owner.is_active
+        }
+    }
+
+
+@router.post("/register-existing-gym", response_model=schemas.GymOwnerRead, status_code=status.HTTP_201_CREATED)
 async def register_gym_owner(
     owner_data: schemas.GymOwnerCreate,
     session: AsyncSession = Depends(get_async_session)
@@ -85,29 +184,36 @@ async def login_gym_owner(
     - **owner**: Owner profile data
     """
     owner = await authenticate_gym_owner(credentials.email, credentials.password, session)
-    
+
     if not owner:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
+
+    # Fetch gym details
+    gym = await session.get(models.Gym, owner.gym_id)
+
     # Create access token
     access_token_expires = timedelta(hours=24)
     access_token = create_access_token(
         data={"sub": str(owner.id), "gym_id": str(owner.gym_id)},
         expires_delta=access_token_expires
     )
-    
+
     return {
         "access_token": access_token,
         "token_type": "bearer",
-        "owner": {
+        "user": {
             "id": str(owner.id),
             "email": owner.email,
-            "full_name": owner.full_name,
+            "owner_name": owner.full_name,
+            "gym_name": gym.name if gym else None,
             "gym_id": str(owner.gym_id),
+            "gym_code": gym.gym_code if gym else None,
+            "phone": owner.phone_number,
+            "address": gym.address if gym else None,
             "is_active": owner.is_active
         }
     }
