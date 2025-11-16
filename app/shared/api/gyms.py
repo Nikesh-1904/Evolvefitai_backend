@@ -448,10 +448,18 @@ async def join_gym_by_code(
         )
 
     # Update user's gym affiliation
+    old_gym_id = current_user.gym_id
     current_user.gym_id = gym.id
     current_user.last_gym_change = datetime.utcnow()
 
+    print(f"🔄 JOIN GYM DEBUG: User {current_user.id} changing gym from {old_gym_id} to {gym.id}")
+    print(f"🔄 Before commit - gym_id: {current_user.gym_id}")
+
     await session.commit()
+    await session.refresh(current_user)
+
+    print(f"✅ After commit - gym_id: {current_user.gym_id}")
+    print(f"✅ Successfully joined {gym.name} (ID: {gym.id})")
 
     return schemas.MessageResponse(
         message=f"Successfully joined {gym.name}!",
