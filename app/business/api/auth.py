@@ -3,6 +3,7 @@
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from datetime import timedelta
 import random
 import string
@@ -47,7 +48,7 @@ async def register_gym_with_owner(
     """
     # Check if email already exists
     existing = await session.execute(
-        models.select(models.GymOwner).where(models.GymOwner.email == registration_data.email)
+        select(models.GymOwner).where(models.GymOwner.email == registration_data.email)
     )
     if existing.scalar_one_or_none():
         raise HTTPException(
@@ -60,7 +61,7 @@ async def register_gym_with_owner(
     # Ensure uniqueness
     while True:
         check_code = await session.execute(
-            models.select(models.Gym).where(models.Gym.gym_code == gym_code)
+            select(models.Gym).where(models.Gym.gym_code == gym_code)
         )
         if not check_code.scalar_one_or_none():
             break
@@ -132,14 +133,14 @@ async def register_gym_owner(
     """
     # Check if email already exists
     existing = await session.execute(
-        models.select(models.GymOwner).where(models.GymOwner.email == owner_data.email)
+        select(models.GymOwner).where(models.GymOwner.email == owner_data.email)
     )
     if existing.scalar_one_or_none():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Email already registered"
         )
-    
+
     # Verify gym exists
     gym = await session.get(models.Gym, owner_data.gym_id)
     if not gym:
