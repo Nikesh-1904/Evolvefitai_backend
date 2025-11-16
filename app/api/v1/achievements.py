@@ -98,8 +98,9 @@ async def unlock_achievement(
         models.UserAchievement.user_id == user.id,
         models.UserAchievement.achievement_id == achievement_id
     )
-    existing_achievement = await session.execute(existing_query)
-    if existing_achievement.scalar_one_or_none():
+    existing_result = await session.execute(existing_query)
+    existing_achievement = existing_result.scalars().first()
+    if existing_achievement:
         # Not an error, just return the current status
         return await get_achievement_status(user, session)
         
