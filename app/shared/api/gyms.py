@@ -421,6 +421,14 @@ async def join_gym_by_code(
     current_user: models.User = Depends(current_active_user)
 ):
     """Join a gym using its unique code."""
+    print("="*80)
+    print(f"🎯 JOIN GYM ENDPOINT CALLED!")
+    print(f"👤 User ID: {current_user.id}")
+    print(f"📧 User Email: {current_user.email}")
+    print(f"🔑 Gym Code Received: '{request_data.gym_code}'")
+    print(f"🏋️ Current gym_id: {current_user.gym_id}")
+    print("="*80)
+
     gym_code = request_data.gym_code.strip().upper() # Standardize code format
 
     if not gym_code:
