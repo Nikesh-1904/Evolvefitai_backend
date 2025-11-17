@@ -224,14 +224,26 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         logger.error(f"   - Field: {error.get('loc')}")
         logger.error(f"     Type: {error.get('type')}")
         logger.error(f"     Message: {error.get('msg')}")
-        logger.error(f"     Input: {error.get('input')}")
+        # Convert input to string if it's bytes
+        error_input = error.get('input')
+        if isinstance(error_input, bytes):
+            error_input = error_input.decode('utf-8', errors='replace')
+        logger.error(f"     Input: {error_input}")
     logger.error("=" * 80)
-    
-    # Return user-friendly error response
+
+    # Return user-friendly error response with serializable data
+    serializable_errors = []
+    for error in exc.errors():
+        error_dict = dict(error)
+        # Convert bytes to string for JSON serialization
+        if 'input' in error_dict and isinstance(error_dict['input'], bytes):
+            error_dict['input'] = error_dict['input'].decode('utf-8', errors='replace')
+        serializable_errors.append(error_dict)
+
     return JSONResponse(
         status_code=422,
         content={
-            "detail": exc.errors(),
+            "detail": serializable_errors,
             "message": "Validation failed. Please check your request data.",
             "errors": [
                 {
