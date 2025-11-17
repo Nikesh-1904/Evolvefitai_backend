@@ -32,15 +32,6 @@ async def list_gym_members(
     - **search**: Search query for username/name/email
     - **membership_status**: Filter by ACTIVE, EXPIRED, SUSPENDED
     """
-    print("="*80)
-    print(f"🏢 LIST GYM MEMBERS ENDPOINT CALLED")
-    print(f"👤 Gym Owner ID: {current_owner.id}")
-    print(f"🏋️ Owner's Gym ID: {current_owner.gym_id}")
-    print(f"🔍 Search: {search}")
-    print(f"📊 Status Filter: {membership_status}")
-    print(f"📄 Skip: {skip}, Limit: {limit}")
-    print("="*80)
-
     query = select(models.User).where(models.User.gym_id == current_owner.gym_id)
 
     # Apply search filter
@@ -61,20 +52,6 @@ async def list_gym_members(
 
     result = await session.execute(query)
     members = result.scalars().all()
-
-    print(f"✅ Found {len(members)} members in gym {current_owner.gym_id}")
-    if len(members) > 0:
-        print("📋 Members found:")
-        for member in members:
-            print(f"   - {member.username} (ID: {member.id}, gym_id: {member.gym_id})")
-    else:
-        print("⚠️  No members found! Checking if any users have this gym_id...")
-        # Debug query to check if ANY users exist with this gym_id
-        check_query = select(func.count(models.User.id)).where(models.User.gym_id == current_owner.gym_id)
-        check_result = await session.execute(check_query)
-        total_users = check_result.scalar()
-        print(f"   Total users with gym_id={current_owner.gym_id}: {total_users}")
-    print("="*80)
 
     return members
 
