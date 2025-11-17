@@ -56,6 +56,81 @@ async def list_gym_members(
     return members
 
 
+@router.get("/stats")
+async def get_member_statistics(
+    current_owner: models.GymOwner = Depends(get_current_gym_owner),
+    session: AsyncSession = Depends(get_async_session)
+):
+    """
+    Get statistical overview of gym members
+
+    Returns:
+    - total_members: Total number of members in the gym
+    - active_members: Members with active membership
+    - new_this_month: New members joined this month
+    - growth_rate: Month-over-month growth percentage
+    """
+    gym_id = current_owner.gym_id
+
+    # Get total members count
+    total_query = select(func.count(models.User.id)).where(models.User.gym_id == gym_id)
+    total_result = await session.execute(total_query)
+    total_members = total_result.scalar() or 0
+
+    # Get active members count
+    active_query = select(func.count(models.User.id)).where(
+        and_(
+            models.User.gym_id == gym_id,
+            models.User.membership_status == "ACTIVE"
+        )
+    )
+    active_result = await session.execute(active_query)
+    active_members = active_result.scalar() or 0
+
+    # Get new members this month
+    now = datetime.utcnow()
+    first_day_of_month = datetime(now.year, now.month, 1)
+
+    new_this_month_query = select(func.count(models.User.id)).where(
+        and_(
+            models.User.gym_id == gym_id,
+            models.User.created_at >= first_day_of_month
+        )
+    )
+    new_this_month_result = await session.execute(new_this_month_query)
+    new_this_month = new_this_month_result.scalar() or 0
+
+    # Calculate growth rate (simplified - comparing this month vs last month)
+    # Get first day of last month
+    if now.month == 1:
+        first_day_last_month = datetime(now.year - 1, 12, 1)
+    else:
+        first_day_last_month = datetime(now.year, now.month - 1, 1)
+
+    last_month_query = select(func.count(models.User.id)).where(
+        and_(
+            models.User.gym_id == gym_id,
+            models.User.created_at >= first_day_last_month,
+            models.User.created_at < first_day_of_month
+        )
+    )
+    last_month_result = await session.execute(last_month_query)
+    last_month_count = last_month_result.scalar() or 0
+
+    # Calculate growth rate percentage
+    if last_month_count > 0:
+        growth_rate = ((new_this_month - last_month_count) / last_month_count) * 100
+    else:
+        growth_rate = 100.0 if new_this_month > 0 else 0.0
+
+    return {
+        "total_members": total_members,
+        "active_members": active_members,
+        "new_this_month": new_this_month,
+        "growth_rate": round(growth_rate, 1)
+    }
+
+
 @router.get("/{user_id}", response_model=schemas.UserRead)
 async def get_member_details(
     user_id: uuid.UUID,
