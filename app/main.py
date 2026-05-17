@@ -12,8 +12,7 @@ from app.core.config import settings
 from app.core.database import create_db_and_tables
 
 # Import routers
-from app.api.v1.api import api_router  # Existing client routes
-from app.shared.api import shared_router  # Shared routes
+from app.api.v1.api import api_router
 from app import models  # Ensure all models are imported for Alembic
 
 # Configure logging
@@ -134,19 +133,7 @@ app.add_middleware(
 )
 
 # Include routers
-
-# Client routes (existing)
-app.include_router(
-    api_router,
-    prefix="/api/v1"
-)
-
-# Shared routes
-app.include_router(
-    shared_router,
-    prefix="/api/v1",
-    tags=["shared"]
-)
+app.include_router(api_router, prefix="/api/v1")
 
 # Root endpoint
 @app.get("/", tags=["root"])
