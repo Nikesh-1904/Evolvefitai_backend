@@ -13,7 +13,6 @@ from app.core.database import create_db_and_tables
 
 # Import routers
 from app.api.v1.api import api_router  # Existing client routes
-from app.business.api import business_router  # Business routes
 from app.shared.api import shared_router  # Shared routes
 from app import models  # Ensure all models are imported for Alembic
 
@@ -98,10 +97,6 @@ async def lifespan(app: FastAPI):
     await create_db_and_tables()
     logger.info("Database tables created/verified")
     
-    # TODO: Start background scheduler for fee reminders
-    # from app.business.services.fee_reminder_service import start_scheduler
-    # start_scheduler()
-    
     logger.info("Application startup complete")
     
     yield
@@ -146,14 +141,7 @@ app.include_router(
     prefix="/api/v1"
 )
 
-# Business routes (new)
-app.include_router(
-    business_router,
-    prefix="/api/v1/business",
-    tags=["business"]
-)
-
-# Shared routes (new)
+# Shared routes
 app.include_router(
     shared_router,
     prefix="/api/v1",
