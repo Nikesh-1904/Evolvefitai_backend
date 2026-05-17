@@ -4,8 +4,7 @@ import uuid
 import datetime
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, desc, and_
-from typing import List
+from sqlalchemy import select, func
 
 from app.core.database import get_async_session
 from app.core.auth import current_active_user
@@ -248,58 +247,3 @@ async def mark_notification_as_read(
     
     return {"message": "Notification marked as read"}
 
-@router.get("/bookings/", response_model=List[schemas.GymBooking])
-async def list_user_bookings(
-    skip: int = Query(0, ge=0),
-    limit: int = Query(100, ge=1, le=1000),
-    session: AsyncSession = Depends(get_async_session),
-    current_user: models.User = Depends(current_active_user)
-):
-    """List current user's bookings"""
-    query = select(models.GymBooking).where(
-        models.GymBooking.user_id == current_user.id
-    ).order_by(desc(models.GymBooking.start_time)).offset(skip).limit(limit)
-    
-    result = await session.execute(query)
-    bookings = result.scalars().all()
-    return bookings
-
-
-@router.delete("/bookings/{booking_id}", response_model=schemas.MessageResponse)
-async def cancel_booking(
-    booking_id: uuid.UUID,
-    session: AsyncSession = Depends(get_async_session),
-    current_user: models.User = Depends(current_active_user)
-):
-    """Cancel a user's booking"""
-    booking_query = select(models.GymBooking).where(
-        and_(
-            models.GymBooking.id == booking_id,
-            models.GymBooking.user_id == current_user.id
-        )
-    )
-    
-    booking_result = await session.execute(booking_query)
-    booking = booking_result.scalar_one_or_none()
-    
-    if not booking:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Booking not found"
-        )
-    
-    if booking.status != "active":
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Booking is already cancelled or completed"
-        )
-    
-    booking.status = "cancelled"
-    booking.cancelled_at = datetime.datetime.now(datetime.timezone.utc)
-    
-    await session.commit()
-    
-    return schemas.MessageResponse(
-        message="Booking cancelled successfully",
-        success=True
-    )
