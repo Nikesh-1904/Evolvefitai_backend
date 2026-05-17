@@ -16,7 +16,6 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from .gym import Gym, GymBooking, UserQRCode, GymAttendance
     from .workout import WorkoutPlan, WorkoutLog
-    from .mealplan import MealPlan
     from .achievement import UserAchievement
     from .fees import MembershipFee
     from .notification import Notification
@@ -97,12 +96,6 @@ class User(SQLAlchemyBaseUserTableUUID, Base):
     )
     workout_logs: Mapped[List["WorkoutLog"]] = relationship(
         "WorkoutLog", 
-        back_populates="user", 
-        cascade="all, delete-orphan",
-        lazy="selectin"
-    )
-    meal_plans: Mapped[List["MealPlan"]] = relationship(
-        "MealPlan", 
         back_populates="user", 
         cascade="all, delete-orphan",
         lazy="selectin"

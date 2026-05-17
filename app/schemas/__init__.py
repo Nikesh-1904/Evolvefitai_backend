@@ -17,9 +17,6 @@ from .workout import (
     WorkoutPlanCreate, WorkoutPlan, WorkoutLogBase, WorkoutLogCreate, WorkoutLog
 )
 
-# Meal Plan Schemas
-from .mealplan import MealPlanBase, MealPlanCreate, MealPlan
-
 # Gym & Booking Schemas
 from .gym import (
     GymBase, GymCreate, Gym, JoinByCodeRequest, GymBookingBase,
@@ -35,10 +32,7 @@ from .interaction import (
 )
 
 # AI Schemas
-from .ai import (
-    WorkoutGenerationRequest, PlateauAnalysis, MealPlanRequest,
-    GeneratedMealPlan
-)
+from .ai import WorkoutGenerationRequest, PlateauAnalysis
 
 # Miscellaneous Schemas
 from .misc import MessageResponse, METValueResponse, LevelProgress, TimeSeriesDataPoint
@@ -79,8 +73,6 @@ __all__ = [
     "LoggedSetDistanceDuration", "LoggedSetQualitative", "AnyLoggedSet",
     "LoggedExercise", "ExerciseBase", "ExerciseCreate", "Exercise", "WorkoutPlanBase",
     "WorkoutPlanCreate", "WorkoutPlan", "WorkoutLogBase", "WorkoutLogCreate", "WorkoutLog",
-    # Meal Plan
-    "MealPlanBase", "MealPlanCreate", "MealPlan",
     # Gym & Booking
     "GymBase", "GymCreate", "Gym", "JoinByCodeRequest", "GymBookingBase",
     "GymBookingCreate", "GymBooking", "GymOccupancyResponse", "LeaderboardEntry",
@@ -90,8 +82,7 @@ __all__ = [
     "TipInteractionCreate", "VideoPreferenceCreate", "ExerciseSetData",
     "ExerciseProgressionDataPoint",
     # AI
-    "WorkoutGenerationRequest", "PlateauAnalysis", "MealPlanRequest",
-    "GeneratedMealPlan",
+    "WorkoutGenerationRequest", "PlateauAnalysis",
     # Misc
     "MessageResponse", "METValueResponse", "LevelProgress", "TimeSeriesDataPoint",
     # Business Owner

@@ -1,7 +1,7 @@
 # app/schemas/ai.py
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
-from .mealplan import MealPlanBase
+
 
 class WorkoutGenerationRequest(BaseModel):
     user_preferences: Optional[Dict[str, Any]] = {}
@@ -19,13 +19,3 @@ class PlateauAnalysis(BaseModel):
     plateau_duration_weeks: int
     analysis_method: str
     ai_generated: bool = False
-
-
-class MealPlanRequest(BaseModel):
-    duration_days: int = 7
-    preferences: Optional[Dict[str, Any]] = {}
-
-class GeneratedMealPlan(MealPlanBase):
-    """Response schema for AI-generated meal plans that aren't stored in DB yet"""
-    ai_generated: bool = True
-    ai_model: Optional[str] = None

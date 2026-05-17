@@ -7,7 +7,6 @@ from .fees import MembershipFee
 from .analytics import MemberPerformance
 from .notification import Notification
 from .achievement import UserAchievement
-from .mealplan import MealPlan
 
 __all__ = [
     "Base",
@@ -27,5 +26,4 @@ __all__ = [
     "MemberPerformance",
     "Notification",
     "UserAchievement",
-    "MealPlan",
 ]
